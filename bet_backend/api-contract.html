@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NBA Box Scores API Contract</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --border: #30363d;
+      --font: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .endpoint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .method {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .method.get { background: #238636; color: white; }
+    .path {
+      font-size: 0.95rem;
+      margin: 0.75rem 1rem;
+      word-break: break-all;
+    }
+    .desc {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0 1rem 0.75rem;
+    }
+    .params, .response {
+      margin: 0 1rem 1rem;
+      font-size: 0.85rem;
+    }
+    .params h4, .response h4 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .type { color: var(--accent); }
+    .required::after { content: ' *'; color: #f85149; }
+    code {
+      background: rgba(110, 118, 129, 0.2);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    .schema {
+      background: rgba(0,0,0,0.3);
+      padding: 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      overflow-x: auto;
+    }
+    .schema pre {
+      margin: 0;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+    }
+    .error-box {
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 6px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .error-box h4 { color: #f85149; }
+  </style>
+</head>
+<body>
+  <h1>NBA Box Scores API</h1>
+  <p class="subtitle">API Contract · Base URL: <code>http://localhost:8080</code></p>
+
+  <!-- List All Boxscores -->
+  <section class="endpoint">
+    <div class="path"><span class="method get">GET</span> /boxscores</div>
+    <p class="desc">List player box scores in the database (paginated), ordered by game date descending, then game ID, then athlete ID.</p>
+    <div class="params">
+      <h4>Query Parameters</h4>
+      <table>
+        <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        <tr><td>page_id</td><td class="type">integer</td><td>No</td><td>Page number (min: 1, default: 1)</td></tr>
+        <tr><td>page_size</td><td class="type">integer</td><td>No</td><td>Items per page (1–100, default: 10)</td></tr>
+      </table>
+    </div>
+    <div class="response">
+      <h4>Response</h4>
+      <p><strong>200 OK</strong> — Array of PlayerBoxscore</p>
+    </div>
+  </section>
+
+  <!-- Data Models -->
+  <h2 style="margin-top: 2.5rem;">Data Models</h2>
+
+  <section class="endpoint">
+    <div class="path">PlayerBoxscore</div>
+    <p class="desc">Full box score record. All fields may be null.</p>
+    <div class="schema">
+      <pre>{
+  "game_id": 401810646,
+  "season": 2026,
+  "season_type": 2,
+  "game_date": "2026-02-12",
+  "game_date_time": "2026-02-13T03:00:00Z",
+  "athlete_id": 4278049,
+  "athlete_display_name": "Daniel Gafford",
+  "team_id": 6,
+  "team_name": "Mavericks",
+  "team_location": "Dallas",
+  "team_short_display_name": "Mavericks",
+  "minutes": "28",
+  "field_goals_made": 1,
+  "field_goals_attempted": 2,
+  "three_point_field_goals_made": 0,
+  "three_point_field_goals_attempted": 0,
+  "free_throws_made": 0,
+  "free_throws_attempted": 0,
+  "offensive_rebounds": 2,
+  "defensive_rebounds": 4,
+  "rebounds": 6,
+  "assists": 1,
+  "steals": 0,
+  "blocks": 1,
+  "turnovers": 2,
+  "fouls": 3,
+  "plus_minus": "-2",
+  "points": 2,
+  "starter": true,
+  "ejected": false,
+  "did_not_play": false,
+  "reason": "COACH'S DECISION",
+  "active": false,
+  "athlete_jersey": "21",
+  "athlete_short_name": "D. Gafford",
+  "athlete_headshot_href": "https://...",
+  "athlete_position_name": "Forward",
+  "athlete_position_abbreviation": "F",
+  "team_display_name": "Dallas Mavericks",
+  "team_uid": "s:40~l:46~t:6",
+  "team_slug": "dallas-mavericks",
+  "team_logo": "https://...",
+  "team_abbreviation": "DAL",
+  "team_color": "0064b1",
+  "team_alternate_color": "bbc4ca",
+  "home_away": "away",
+  "team_winner": false,
+  "team_score": 104,
+  "opponent_team_id": 13,
+  "opponent_team_name": "Lakers",
+  "opponent_team_location": "Los Angeles",
+  "opponent_team_display_name": "Los Angeles Lakers",
+  "opponent_team_abbreviation": "LAL",
+  "opponent_team_logo": "https://...",
+  "opponent_team_color": "552583",
+  "opponent_team_alternate_color": "fdb927",
+  "opponent_team_score": 124
+}</pre>
+    </div>
+  </section>
+
+  <!-- Error Responses -->
+  <h2 style="margin-top: 2.5rem;">Error Responses</h2>
+  <section class="endpoint">
+    <div class="error-box">
+      <h4>400 Bad Request</h4>
+      <p>Invalid parameters (e.g. page_id &lt; 1, page_size outside 1–100).</p>
+      <div class="schema"><pre>{"error": "&lt;validation message&gt;"}</pre></div>
+    </div>
+    <div class="error-box">
+      <h4>500 Internal Server Error</h4>
+      <p>Database or server error.</p>
+      <div class="schema"><pre>{"error": "&lt;error message&gt;"}</pre></div>
+    </div>
+  </section>
+</body>
+</html>

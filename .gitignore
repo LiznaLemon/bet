@@ -1,0 +1,41 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+bet_backend/bet_backend
+bet_backend/*.test
+bet_backend/coverage.out
+
+# R
+.RData
+.Rhistory
+.Rapp.history
+*.Rproj.user
+.Rprofile
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs & temp
+*.log
+tmp/
+temp/
+.cache/

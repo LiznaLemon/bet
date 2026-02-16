@@ -11,12 +11,12 @@ migrateup:
 	docker run --rm -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose up
 
 migratedown:
-	docker run --rm -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose down
+	echo y | docker run --rm -i -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose down
 
 # Populate nba_analytics from hoopR (requires R). Run from bet_backend.
 # Run `make migrateup` first so player_boxscores_raw exists.
 populatenba:
-	Rscript nba_data_collection.R.r
+	Rscript nba_data_to_db.R.r
 
 sqlc:
 	sqlc generate
@@ -27,9 +27,12 @@ test:
 server:
 	go run main.go
 
-start-db: postgres createdb migrateup
+# Full DB setup: start Postgres, create DB, run migrations, populate NBA data.
+# Waits for Postgres to be ready before creating the DB.
+start-db: postgres
+	@sleep 3 && $(MAKE) createdb migrateup populatenba
 
-resetdb: migratedown migrateup populatenba populatenba 
+reload-db: migratedown migrateup populatenba
 
 
-.PHONY: postgres createdb dropdb migrateup migratedown populatenba sqlc serverpostgres resetdb start-db-server
+.PHONY: postgres createdb dropdb migrateup migratedown populatenba sqlc server test resetdb start-db

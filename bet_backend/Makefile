@@ -1,5 +1,5 @@
 postgres:
-	docker run --name bet_nba_db -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres
+	docker run --name bet_nba_db -p 5433:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres
 
 createdb:
 	docker exec -it bet_nba_db createdb --username=root --owner=root nba_analytics
@@ -8,10 +8,10 @@ dropdb:
 	docker exec -it bet_nba_db dropdb nba_analytics
 
 migrateup:
-	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/nba_analytics?sslmode=disable" --verbose up
+	docker run --rm -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose up
 
 migratedown:
-	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/nba_analytics?sslmode=disable" --verbose down
+	docker run --rm -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose down
 
 # Populate nba_analytics from hoopR (requires R). Run from bet_backend.
 # Run `make migrateup` first so player_boxscores_raw exists.

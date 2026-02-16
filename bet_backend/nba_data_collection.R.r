@@ -49,7 +49,7 @@ cat(sprintf("Date range: %s to %s\n",
 # ===== POSTGRESQL CONFIGURATION =====
 # Update these settings for your PostgreSQL setup
 PG_HOST <- "localhost"
-PG_PORT <- 5432
+PG_PORT <- 5433
 PG_USER <- "root"  # Change to your PostgreSQL username
 PG_PASSWORD <- "secret"      # Enter your PostgreSQL password
 DB_NAME <- "nba_analytics"

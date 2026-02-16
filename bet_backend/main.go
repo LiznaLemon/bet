@@ -12,7 +12,7 @@ import (
 
 const (
 	dbDriver      = "postgres"
-	dbSource      = "postgresql://root:secret@localhost:5432/nba_analytics?sslmode=disable"
+	dbSource      = "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable"
 	serverAddress = "0.0.0.0:8080"
 )
 

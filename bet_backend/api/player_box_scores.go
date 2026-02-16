@@ -5,6 +5,7 @@ import (
 	db "bet/db/sqlc"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,13 @@ type listBoxScoresResponse struct {
 	Data     []models.BoxScore `json:"data"`
 	PageID   int32             `json:"page_id"`
 	PageSize int32             `json:"page_size"`
+}
+
+// paginatedResponse is a generic paginated response for list endpoints
+type paginatedResponse struct {
+	Data     interface{} `json:"data"`
+	PageID   int32       `json:"page_id"`
+	PageSize int32       `json:"page_size"`
 }
 
 func (server *Server) ListAllBoxscores(ctx *gin.Context) {
@@ -101,17 +109,17 @@ func rawToBoxScore(r db.PlayerBoxscoresRaw) models.BoxScore {
 		AthleteHeadshotHref:           nullStringPtr(r.AthleteHeadshotHref),
 		AthletePositionName:           nullStringPtr(r.AthletePositionName),
 		AthletePositionAbbreviation:   nullStringPtr(r.AthletePositionAbbreviation),
-		TeamDisplayName:               r.TeamDisplayName,
-		TeamUid:                       r.TeamUid,
-		TeamSlug:                      r.TeamSlug,
-		TeamLogo:                      r.TeamLogo,
-		TeamAbbreviation:              r.TeamAbbreviation,
-		TeamColor:                     r.TeamColor,
-		TeamAlternateColor:            r.TeamAlternateColor,
-		HomeAway:                      r.HomeAway,
-		TeamWinner:                    r.TeamWinner,
-		TeamScore:                     r.TeamScore,
-		OpponentTeamID:                r.OpponentTeamID,
+		TeamDisplayName:               nullStringVal(r.TeamDisplayName),
+		TeamUid:                       nullStringVal(r.TeamUid),
+		TeamSlug:                      nullStringVal(r.TeamSlug),
+		TeamLogo:                      nullStringVal(r.TeamLogo),
+		TeamAbbreviation:              nullStringVal(r.TeamAbbreviation),
+		TeamColor:                     nullStringVal(r.TeamColor),
+		TeamAlternateColor:            nullStringVal(r.TeamAlternateColor),
+		HomeAway:                      nullStringVal(r.HomeAway),
+		TeamWinner:                    nullBoolVal(r.TeamWinner),
+		TeamScore:                     nullInt32Val(r.TeamScore),
+		OpponentTeamID:                nullInt64Val(r.OpponentTeamID),
 		OpponentTeamName:              nullStringPtr(r.OpponentTeamName),
 		OpponentTeamLocation:          nullStringPtr(r.OpponentTeamLocation),
 		OpponentTeamDisplayName:       nullStringPtr(r.OpponentTeamDisplayName),
@@ -140,6 +148,48 @@ func nullInt32Ptr(n sql.NullInt32) *int32 {
 func nullBoolPtr(n sql.NullBool) *bool {
 	if n.Valid {
 		return &n.Bool
+	}
+	return nil
+}
+
+func nullStringVal(n sql.NullString) string {
+	if n.Valid {
+		return n.String
+	}
+	return ""
+}
+
+func nullBoolVal(n sql.NullBool) bool {
+	if n.Valid {
+		return n.Bool
+	}
+	return false
+}
+
+func nullInt32Val(n sql.NullInt32) int32 {
+	if n.Valid {
+		return n.Int32
+	}
+	return 0
+}
+
+func nullInt64Val(n sql.NullInt64) int64 {
+	if n.Valid {
+		return n.Int64
+	}
+	return 0
+}
+
+func nullTimePtr(n sql.NullTime) *time.Time {
+	if n.Valid {
+		return &n.Time
+	}
+	return nil
+}
+
+func nullInt64Ptr(n sql.NullInt64) *int64 {
+	if n.Valid {
+		return &n.Int64
 	}
 	return nil
 }

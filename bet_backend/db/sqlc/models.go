@@ -4,8 +4,78 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
+
+type PlayByPlayRaw struct {
+	ID                           sql.NullString `json:"id"`
+	SequenceNumber               sql.NullString `json:"sequence_number"`
+	TypeID                       sql.NullInt32  `json:"type_id"`
+	TypeText                     sql.NullString `json:"type_text"`
+	Text                         sql.NullString `json:"text"`
+	AwayScore                    sql.NullInt32  `json:"away_score"`
+	HomeScore                    sql.NullInt32  `json:"home_score"`
+	PeriodNumber                 sql.NullInt32  `json:"period_number"`
+	PeriodDisplayValue           sql.NullString `json:"period_display_value"`
+	ClockDisplayValue            sql.NullString `json:"clock_display_value"`
+	ScoringPlay                  sql.NullBool   `json:"scoring_play"`
+	ScoreValue                   sql.NullInt32  `json:"score_value"`
+	TeamID                       sql.NullInt32  `json:"team_id"`
+	AthleteID1                   sql.NullInt32  `json:"athlete_id_1"`
+	AthleteID2                   sql.NullInt32  `json:"athlete_id_2"`
+	AthleteID3                   sql.NullInt32  `json:"athlete_id_3"`
+	Wallclock                    sql.NullString `json:"wallclock"`
+	ShootingPlay                 sql.NullBool   `json:"shooting_play"`
+	CoordinateXRaw               sql.NullString `json:"coordinate_x_raw"`
+	CoordinateYRaw               sql.NullString `json:"coordinate_y_raw"`
+	PointsAttempted              sql.NullInt32  `json:"points_attempted"`
+	ShortDescription             sql.NullString `json:"short_description"`
+	Season                       sql.NullInt32  `json:"season"`
+	SeasonType                   sql.NullInt32  `json:"season_type"`
+	AwayTeamID                   sql.NullInt32  `json:"away_team_id"`
+	AwayTeamName                 sql.NullString `json:"away_team_name"`
+	AwayTeamMascot               sql.NullString `json:"away_team_mascot"`
+	AwayTeamAbbrev               sql.NullString `json:"away_team_abbrev"`
+	AwayTeamNameAlt              sql.NullString `json:"away_team_name_alt"`
+	HomeTeamID                   sql.NullInt32  `json:"home_team_id"`
+	HomeTeamName                 sql.NullString `json:"home_team_name"`
+	HomeTeamMascot               sql.NullString `json:"home_team_mascot"`
+	HomeTeamAbbrev               sql.NullString `json:"home_team_abbrev"`
+	HomeTeamNameAlt              sql.NullString `json:"home_team_name_alt"`
+	HomeTeamSpread               sql.NullString `json:"home_team_spread"`
+	GameSpread                   sql.NullString `json:"game_spread"`
+	HomeFavorite                 sql.NullBool   `json:"home_favorite"`
+	GameSpreadAvailable          sql.NullBool   `json:"game_spread_available"`
+	GameID                       sql.NullInt64  `json:"game_id"`
+	Qtr                          sql.NullInt32  `json:"qtr"`
+	Time                         sql.NullString `json:"time"`
+	ClockMinutes                 sql.NullInt32  `json:"clock_minutes"`
+	ClockSeconds                 sql.NullString `json:"clock_seconds"`
+	Half                         sql.NullString `json:"half"`
+	GameHalf                     sql.NullString `json:"game_half"`
+	LeadQtr                      sql.NullInt32  `json:"lead_qtr"`
+	LeadGameHalf                 sql.NullString `json:"lead_game_half"`
+	LeadHalf                     sql.NullString `json:"lead_half"`
+	StartQuarterSecondsRemaining sql.NullString `json:"start_quarter_seconds_remaining"`
+	StartHalfSecondsRemaining    sql.NullString `json:"start_half_seconds_remaining"`
+	StartGameSecondsRemaining    sql.NullString `json:"start_game_seconds_remaining"`
+	GamePlayNumber               sql.NullInt32  `json:"game_play_number"`
+	EndQuarterSecondsRemaining   sql.NullString `json:"end_quarter_seconds_remaining"`
+	EndHalfSecondsRemaining      sql.NullString `json:"end_half_seconds_remaining"`
+	EndGameSecondsRemaining      sql.NullString `json:"end_game_seconds_remaining"`
+	Period                       sql.NullInt32  `json:"period"`
+	LagQtr                       sql.NullInt32  `json:"lag_qtr"`
+	LagGameHalf                  sql.NullString `json:"lag_game_half"`
+	LagHalf                      sql.NullString `json:"lag_half"`
+	CoordinateX                  sql.NullString `json:"coordinate_x"`
+	CoordinateY                  sql.NullString `json:"coordinate_y"`
+	GameDate                     sql.NullTime   `json:"game_date"`
+	GameDateTime                 sql.NullTime   `json:"game_date_time"`
+	TypeAbbreviation             sql.NullString `json:"type_abbreviation"`
+	HomeTimeoutCalled            sql.NullBool   `json:"home_timeout_called"`
+	AwayTimeoutCalled            sql.NullBool   `json:"away_timeout_called"`
+}
 
 type PlayerBoxscoresRaw struct {
 	GameID                        int64          `json:"game_id"`
@@ -46,17 +116,17 @@ type PlayerBoxscoresRaw struct {
 	AthleteHeadshotHref           sql.NullString `json:"athlete_headshot_href"`
 	AthletePositionName           sql.NullString `json:"athlete_position_name"`
 	AthletePositionAbbreviation   sql.NullString `json:"athlete_position_abbreviation"`
-	TeamDisplayName               string         `json:"team_display_name"`
-	TeamUid                       string         `json:"team_uid"`
-	TeamSlug                      string         `json:"team_slug"`
-	TeamLogo                      string         `json:"team_logo"`
-	TeamAbbreviation              string         `json:"team_abbreviation"`
-	TeamColor                     string         `json:"team_color"`
-	TeamAlternateColor            string         `json:"team_alternate_color"`
-	HomeAway                      string         `json:"home_away"`
-	TeamWinner                    bool           `json:"team_winner"`
-	TeamScore                     int32          `json:"team_score"`
-	OpponentTeamID                int64          `json:"opponent_team_id"`
+	TeamDisplayName               sql.NullString `json:"team_display_name"`
+	TeamUid                       sql.NullString `json:"team_uid"`
+	TeamSlug                      sql.NullString `json:"team_slug"`
+	TeamLogo                      sql.NullString `json:"team_logo"`
+	TeamAbbreviation              sql.NullString `json:"team_abbreviation"`
+	TeamColor                     sql.NullString `json:"team_color"`
+	TeamAlternateColor            sql.NullString `json:"team_alternate_color"`
+	HomeAway                      sql.NullString `json:"home_away"`
+	TeamWinner                    sql.NullBool   `json:"team_winner"`
+	TeamScore                     sql.NullInt32  `json:"team_score"`
+	OpponentTeamID                sql.NullInt64  `json:"opponent_team_id"`
 	OpponentTeamName              sql.NullString `json:"opponent_team_name"`
 	OpponentTeamLocation          sql.NullString `json:"opponent_team_location"`
 	OpponentTeamDisplayName       sql.NullString `json:"opponent_team_display_name"`
@@ -64,5 +134,146 @@ type PlayerBoxscoresRaw struct {
 	OpponentTeamLogo              sql.NullString `json:"opponent_team_logo"`
 	OpponentTeamColor             sql.NullString `json:"opponent_team_color"`
 	OpponentTeamAlternateColor    sql.NullString `json:"opponent_team_alternate_color"`
+	OpponentTeamScore             sql.NullInt32  `json:"opponent_team_score"`
+}
+
+type Schedule struct {
+	ID                      sql.NullInt32   `json:"id"`
+	Uid                     sql.NullString  `json:"uid"`
+	Date                    sql.NullString  `json:"date"`
+	Attendance              sql.NullInt32   `json:"attendance"`
+	TimeValid               sql.NullBool    `json:"time_valid"`
+	NeutralSite             sql.NullBool    `json:"neutral_site"`
+	ConferenceCompetition   sql.NullBool    `json:"conference_competition"`
+	Recent                  sql.NullBool    `json:"recent"`
+	StartDate               sql.NullString  `json:"start_date"`
+	NotesType               sql.NullString  `json:"notes_type"`
+	NotesHeadline           sql.NullString  `json:"notes_headline"`
+	TypeID                  sql.NullInt32   `json:"type_id"`
+	TypeAbbreviation        sql.NullString  `json:"type_abbreviation"`
+	VenueID                 sql.NullInt32   `json:"venue_id"`
+	VenueFullName           sql.NullString  `json:"venue_full_name"`
+	VenueAddressCity        sql.NullString  `json:"venue_address_city"`
+	VenueCapacity           sql.NullInt32   `json:"venue_capacity"`
+	VenueIndoor             sql.NullBool    `json:"venue_indoor"`
+	StatusClock             sql.NullInt32   `json:"status_clock"`
+	StatusDisplayClock      sql.NullString  `json:"status_display_clock"`
+	StatusPeriod            sql.NullInt32   `json:"status_period"`
+	StatusTypeID            sql.NullInt32   `json:"status_type_id"`
+	StatusTypeName          sql.NullString  `json:"status_type_name"`
+	StatusTypeState         sql.NullString  `json:"status_type_state"`
+	StatusTypeCompleted     sql.NullBool    `json:"status_type_completed"`
+	StatusTypeDescription   sql.NullString  `json:"status_type_description"`
+	StatusTypeDetail        sql.NullString  `json:"status_type_detail"`
+	StatusTypeShortDetail   sql.NullString  `json:"status_type_short_detail"`
+	FormatRegulationPeriods sql.NullInt32   `json:"format_regulation_periods"`
+	HomeID                  sql.NullInt32   `json:"home_id"`
+	HomeUid                 sql.NullString  `json:"home_uid"`
+	HomeLocation            sql.NullString  `json:"home_location"`
+	HomeName                sql.NullString  `json:"home_name"`
+	HomeAbbreviation        sql.NullString  `json:"home_abbreviation"`
+	HomeDisplayName         sql.NullString  `json:"home_display_name"`
+	HomeShortDisplayName    sql.NullString  `json:"home_short_display_name"`
+	HomeColor               sql.NullString  `json:"home_color"`
+	HomeAlternateColor      sql.NullString  `json:"home_alternate_color"`
+	HomeIsActive            sql.NullBool    `json:"home_is_active"`
+	HomeVenueID             sql.NullInt32   `json:"home_venue_id"`
+	HomeLogo                sql.NullString  `json:"home_logo"`
+	HomeScore               sql.NullInt32   `json:"home_score"`
+	HomeWinner              sql.NullBool    `json:"home_winner"`
+	AwayID                  sql.NullInt32   `json:"away_id"`
+	AwayUid                 sql.NullString  `json:"away_uid"`
+	AwayLocation            sql.NullString  `json:"away_location"`
+	AwayName                sql.NullString  `json:"away_name"`
+	AwayAbbreviation        sql.NullString  `json:"away_abbreviation"`
+	AwayDisplayName         sql.NullString  `json:"away_display_name"`
+	AwayShortDisplayName    sql.NullString  `json:"away_short_display_name"`
+	AwayColor               sql.NullString  `json:"away_color"`
+	AwayAlternateColor      sql.NullString  `json:"away_alternate_color"`
+	AwayIsActive            sql.NullBool    `json:"away_is_active"`
+	AwayVenueID             sql.NullInt32   `json:"away_venue_id"`
+	AwayLogo                sql.NullString  `json:"away_logo"`
+	AwayScore               sql.NullInt32   `json:"away_score"`
+	AwayWinner              sql.NullBool    `json:"away_winner"`
+	GameID                  sql.NullInt64   `json:"game_id"`
+	Season                  sql.NullInt32   `json:"season"`
+	SeasonType              sql.NullInt32   `json:"season_type"`
+	VenueAddressState       sql.NullString  `json:"venue_address_state"`
+	StatusTypeAltDetail     sql.NullString  `json:"status_type_alt_detail"`
+	PBP                     sql.NullString  `json:"PBP"`
+	TeamBox                 sql.NullBool    `json:"team_box"`
+	PlayerBox               sql.NullBool    `json:"player_box"`
+	GameDateTime            sql.NullTime    `json:"game_date_time"`
+	GameDate                sql.NullTime    `json:"game_date"`
+	PlayByPlayAvailable     sql.NullBool    `json:"play_by_play_available"`
+	Broadcast               sql.NullString  `json:"broadcast"`
+	Highlights              sql.NullString  `json:"highlights"`
+	BroadcastMarket         sql.NullString  `json:"broadcast_market"`
+	BroadcastName           sql.NullString  `json:"broadcast_name"`
+	HomeLinescores          sql.NullString  `json:"home_linescores"`
+	HomeRecords             sql.NullString  `json:"home_records"`
+	AwayLinescores          sql.NullString  `json:"away_linescores"`
+	AwayRecords             sql.NullString  `json:"away_records"`
+	GameJson                json.RawMessage `json:"game_json"`
+	GameJsonUrl             sql.NullString  `json:"game_json_url"`
+}
+
+type TeamBoxscoresRaw struct {
+	GameID                        int64          `json:"game_id"`
+	Season                        int32          `json:"season"`
+	SeasonType                    int32          `json:"season_type"`
+	GameDate                      time.Time      `json:"game_date"`
+	GameDateTime                  time.Time      `json:"game_date_time"`
+	TeamID                        int64          `json:"team_id"`
+	TeamUid                       sql.NullString `json:"team_uid"`
+	TeamSlug                      sql.NullString `json:"team_slug"`
+	TeamLocation                  sql.NullString `json:"team_location"`
+	TeamName                      sql.NullString `json:"team_name"`
+	TeamAbbreviation              sql.NullString `json:"team_abbreviation"`
+	TeamDisplayName               sql.NullString `json:"team_display_name"`
+	TeamShortDisplayName          sql.NullString `json:"team_short_display_name"`
+	TeamColor                     sql.NullString `json:"team_color"`
+	TeamAlternateColor            sql.NullString `json:"team_alternate_color"`
+	TeamLogo                      sql.NullString `json:"team_logo"`
+	TeamHomeAway                  sql.NullString `json:"team_home_away"`
+	TeamScore                     sql.NullInt32  `json:"team_score"`
+	TeamWinner                    sql.NullBool   `json:"team_winner"`
+	Assists                       sql.NullInt32  `json:"assists"`
+	Blocks                        sql.NullInt32  `json:"blocks"`
+	DefensiveRebounds             sql.NullInt32  `json:"defensive_rebounds"`
+	FastBreakPoints               sql.NullString `json:"fast_break_points"`
+	FieldGoalPct                  sql.NullString `json:"field_goal_pct"`
+	FieldGoalsMade                sql.NullInt32  `json:"field_goals_made"`
+	FieldGoalsAttempted           sql.NullInt32  `json:"field_goals_attempted"`
+	FlagrantFouls                 sql.NullInt32  `json:"flagrant_fouls"`
+	Fouls                         sql.NullInt32  `json:"fouls"`
+	FreeThrowPct                  sql.NullString `json:"free_throw_pct"`
+	FreeThrowsMade                sql.NullInt32  `json:"free_throws_made"`
+	FreeThrowsAttempted           sql.NullInt32  `json:"free_throws_attempted"`
+	LargestLead                   sql.NullString `json:"largest_lead"`
+	OffensiveRebounds             sql.NullInt32  `json:"offensive_rebounds"`
+	PointsInPaint                 sql.NullString `json:"points_in_paint"`
+	Steals                        sql.NullInt32  `json:"steals"`
+	TeamTurnovers                 sql.NullInt32  `json:"team_turnovers"`
+	TechnicalFouls                sql.NullInt32  `json:"technical_fouls"`
+	ThreePointFieldGoalPct        sql.NullString `json:"three_point_field_goal_pct"`
+	ThreePointFieldGoalsMade      sql.NullInt32  `json:"three_point_field_goals_made"`
+	ThreePointFieldGoalsAttempted sql.NullInt32  `json:"three_point_field_goals_attempted"`
+	TotalRebounds                 sql.NullInt32  `json:"total_rebounds"`
+	TotalTechnicalFouls           sql.NullInt32  `json:"total_technical_fouls"`
+	TotalTurnovers                sql.NullInt32  `json:"total_turnovers"`
+	TurnoverPoints                sql.NullString `json:"turnover_points"`
+	Turnovers                     sql.NullInt32  `json:"turnovers"`
+	OpponentTeamID                sql.NullInt64  `json:"opponent_team_id"`
+	OpponentTeamUid               sql.NullString `json:"opponent_team_uid"`
+	OpponentTeamSlug              sql.NullString `json:"opponent_team_slug"`
+	OpponentTeamLocation          sql.NullString `json:"opponent_team_location"`
+	OpponentTeamName              sql.NullString `json:"opponent_team_name"`
+	OpponentTeamAbbreviation      sql.NullString `json:"opponent_team_abbreviation"`
+	OpponentTeamDisplayName       sql.NullString `json:"opponent_team_display_name"`
+	OpponentTeamShortDisplayName  sql.NullString `json:"opponent_team_short_display_name"`
+	OpponentTeamColor             sql.NullString `json:"opponent_team_color"`
+	OpponentTeamAlternateColor    sql.NullString `json:"opponent_team_alternate_color"`
+	OpponentTeamLogo              sql.NullString `json:"opponent_team_logo"`
 	OpponentTeamScore             sql.NullInt32  `json:"opponent_team_score"`
 }

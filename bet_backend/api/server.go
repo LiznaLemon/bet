@@ -17,6 +17,9 @@ func NewServer(store *db.Store) *Server {
 	router := gin.Default()
 
 	router.GET("/boxscores", server.ListAllBoxscores)
+	router.GET("/play-by-play", server.ListPlayByPlay)
+	router.GET("/team-boxscores", server.ListTeamBoxscores)
+	router.GET("/schedules", server.ListSchedules)
 
 	server.router = router
 	return server

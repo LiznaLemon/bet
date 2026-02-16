@@ -268,7 +268,7 @@ CREATE TABLE schedules (
   season_type INTEGER,
   venue_address_state TEXT,
   status_type_alt_detail TEXT,
-  "PBP" BOOLEAN,
+  "PBP" TEXT,
   team_box BOOLEAN,
   player_box BOOLEAN,
   game_date_time TIMESTAMPTZ,

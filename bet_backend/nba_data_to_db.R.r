@@ -57,7 +57,7 @@ for (tn in TABLE_NAMES) {
   cat(sprintf("  Truncated %s\n", tn))
 }
 
-# Load and write each dataset (hoopR writes to DB when dbConnection + tablename are set)
+# Load and write each dataset
 cat("\nLoading player box scores...\n")
 load_nba_player_box(seasons = seasons, dbConnection = con, tablename = TABLE_NAMES$player_box)
 
@@ -65,11 +65,23 @@ cat("Loading play-by-play...\n")
 load_nba_pbp(seasons = seasons, dbConnection = con, tablename = TABLE_NAMES$play_by_play)
 
 cat("Loading team box scores...\n")
-load_nba_team_box(seasons = seasons, dbConnection = con, tablename = TABLE_NAMES$team_box)
+team_box_data <- load_nba_team_box(seasons = seasons)
+
+if (!is.null(team_box_data) && nrow(team_box_data) > 0) {
+  # Convert to standard data frame
+  team_box_df <- team_box_data %>% 
+    as_tibble() %>% 
+    as.data.frame()
+  
+  dbWriteTable(con, TABLE_NAMES$team_box, team_box_df, 
+               overwrite = FALSE, append = TRUE)
+  cat(sprintf("  Wrote %d rows to team_boxscores_raw\n", nrow(team_box_df)))
+} else {
+  warning("No team box data returned")
+}
 
 cat("Loading schedules...\n")
 load_nba_schedule(seasons = seasons, dbConnection = con, tablename = TABLE_NAMES$schedules)
-
 # Verify row counts
 cat("\n===== Row counts =====\n")
 for (tn in TABLE_NAMES) {

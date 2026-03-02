@@ -163,6 +163,8 @@ CREATE TABLE team_boxscores_raw (
   assists INTEGER,
   blocks INTEGER,
   defensive_rebounds INTEGER,
+  disqualifications INTEGER,
+  ejections INTEGER,
   fast_break_points TEXT,
   field_goal_pct NUMERIC,
   field_goals_made INTEGER,
@@ -173,6 +175,8 @@ CREATE TABLE team_boxscores_raw (
   free_throws_made INTEGER,
   free_throws_attempted INTEGER,
   largest_lead TEXT,
+  lead_changes INTEGER,
+  lead_percentage NUMERIC,
   offensive_rebounds INTEGER,
   points_in_paint TEXT,
   steals INTEGER,
@@ -181,6 +185,7 @@ CREATE TABLE team_boxscores_raw (
   three_point_field_goal_pct NUMERIC,
   three_point_field_goals_made INTEGER,
   three_point_field_goals_attempted INTEGER,
+  times_tied INTEGER,
   total_rebounds INTEGER,
   total_technical_fouls INTEGER,
   total_turnovers INTEGER,
@@ -198,7 +203,9 @@ CREATE TABLE team_boxscores_raw (
   opponent_team_alternate_color TEXT,
   opponent_team_logo TEXT,
   opponent_team_score INTEGER
+
 );
+
 CREATE INDEX IF NOT EXISTS idx_team_boxscores_raw_team_id ON team_boxscores_raw (team_id);
 CREATE INDEX IF NOT EXISTS idx_team_boxscores_raw_game_date ON team_boxscores_raw (game_date);
 CREATE INDEX IF NOT EXISTS idx_team_boxscores_raw_game_id ON team_boxscores_raw (game_id);

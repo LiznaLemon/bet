@@ -17,6 +17,7 @@ From **`bet_backend`**:
 cd bet_backend
 make start-db   # Start Postgres, create DB, run migrations, populate NBA data
 make server     # Run the Go API
+make updatenba  #get latest nba data added to the db  
 ```
 
 ## Make targets (run from `bet_backend`)
@@ -35,14 +36,3 @@ make server     # Run the Go API
 | `make test` | Run Go tests with coverage |
 | `make sqlc` | Generate Go code from SQL (sqlc) |
 
-## Backend only (no R)
-
-To run the API against an existing DB without loading NBA data:
-
-```bash
-cd bet_backend
-make postgres
-make createdb
-make migrateup
-make server
-```

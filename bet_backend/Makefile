@@ -13,10 +13,14 @@ migrateup:
 migratedown:
 	echo y | docker run --rm -i -v $(shell pwd)/db/migration:/migration --network host migrate/migrate -path=/migration -database "postgresql://root:secret@localhost:5433/nba_analytics?sslmode=disable" -verbose down
 
-# Populate nba_analytics from hoopR (requires R). Run from bet_backend.
-# Run `make migrateup` first so player_boxscores_raw exists.
+
+# Update with only new data (incremental - for daily updates)
+updatenba:
+	Rscript nba_data_to_db.r --incremental
+
+# Full reload (truncate and reload all - for initial setup or reset)
 populatenba:
-	Rscript nba_data_to_db.R.r
+	Rscript nba_data_to_db.r --full
 
 sqlc:
 	sqlc generate
@@ -35,4 +39,4 @@ start-db: postgres
 reload-db: migratedown migrateup populatenba
 
 
-.PHONY: postgres createdb dropdb migrateup migratedown populatenba sqlc server test resetdb start-db
+.PHONY: postgres createdb dropdb migrateup migratedown populatenba sqlc server test resetdb start-db reload-db updatenba

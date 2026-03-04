@@ -11,29 +11,20 @@ library(DBI)
 library(RPostgres)
 
 # ===== PARSE COMMAND LINE ARGUMENTS =====
+# Read command-line argument
 args <- commandArgs(trailingOnly = TRUE)
-FULL_RELOAD <- FALSE
+load_type <- if (length(args) >= 1) args[1] else "--incremental"
 
-if (length(args) > 0) {
-  if (args[1] == "--full") {
-    FULL_RELOAD <- TRUE
-  } else if (args[1] == "--incremental") {
-    FULL_RELOAD <- FALSE
-  } else {
-    stop("Invalid argument. Use --full or --incremental")
-  }
-}
+# Read DB URL from environment (never from args)
+db_url <- Sys.getenv("DATABASE_URL")
+if (db_url == "") stop("DATABASE_URL secret is not set")
+
+cat("Load type:", load_type, "\n")
 
 cat("=====================================\n")
 cat(sprintf("Mode: %s\n", if(FULL_RELOAD) "FULL RELOAD (TRUNCATE)" else "INCREMENTAL UPDATE"))
 cat("=====================================\n\n")
 
-# ===== DB CONFIGURATION =====
-PG_HOST <- "localhost"
-PG_PORT <- 5433
-PG_USER <- "root"
-PG_PASSWORD <- "secret"
-DB_NAME <- "nba_analytics"
 
 TABLE_NAMES <- list(
   player_box = "player_boxscores_raw",

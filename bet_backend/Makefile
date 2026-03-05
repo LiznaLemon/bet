@@ -16,11 +16,11 @@ migratedown:
 
 # Update with only new data (incremental - for daily updates)
 updatenba:
-	Rscript nba_data_to_db.r --incremental
+	Rscript ../scripts/nba_data_to_db.r --incremental
 
 # Full reload (truncate and reload all - for initial setup or reset)
 populatenba:
-	Rscript nba_data_to_db.r --full
+	Rscript ../scripts/nba_data_to_db.r --full
 
 sqlc:
 	sqlc generate
@@ -37,6 +37,8 @@ start-db: postgres
 	@sleep 3 && $(MAKE) createdb migrateup populatenba
 
 reload-db: migratedown migrateup populatenba
+
+refresh-db: 
 
 
 .PHONY: postgres createdb dropdb migrateup migratedown populatenba sqlc server test resetdb start-db reload-db updatenba

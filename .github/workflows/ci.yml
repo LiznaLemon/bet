@@ -1,9 +1,11 @@
-# .github/workflows/run-r-script.yml
-name: Run R Script
+# .github/workflows/refresh-db.yml
+name: Refresh DB
 
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 9 * * *" # 9:00 AM UTC daily
   workflow_dispatch:
     inputs:
       load_type:
@@ -17,8 +19,9 @@ on:
 
 jobs:
   run-r:
-    name: Run R Script
+    name: Refresh DB
     runs-on: ubuntu-latest
+    environment: prod
 
     steps:
       - name: Checkout code
@@ -29,16 +32,14 @@ jobs:
         with:
           r-version: "4.4.0"
 
-      - name: Install R dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          packages: |
-            any::dplyr
-            any::ggplot2
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y libpq-dev libcurl4-openssl-dev libssl-dev
+          Rscript -e "install.packages(c('hoopR', 'dplyr', 'DBI', 'RPostgres'))"
 
       - name: Run R script
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BET_DATABASE_URL: ${{ secrets.BET_DATABASE_URL }}
         run: |
-          Rscript bet/bet_backend/nba_data_to_db.r \
+          Rscript scripts/nba_data_to_db.r \
             "${{ github.event.inputs.load_type || '--incremental' }}"

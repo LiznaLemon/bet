@@ -1,0 +1,2 @@
+# Python dependencies for scripts (e.g. fetch-play-by-play-nba-api.py)
+nba_api>=1.4

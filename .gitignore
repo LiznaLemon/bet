@@ -21,6 +21,15 @@ bet_backend/coverage.out
 *.Rproj.user
 .Rprofile
 
+# Node / React Native / Expo
+node_modules/
+.expo/
+dist/
+*.tsbuildinfo
+expo-env.d.ts
+*.jsbundle
+*.hbc
+
 # IDE / editors
 .idea/
 .vscode/
@@ -39,3 +48,6 @@ bet_backend/coverage.out
 tmp/
 temp/
 .cache/
+
+# Project-specific
+markdown_plans/

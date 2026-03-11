@@ -1,0 +1,117 @@
+/** Schedule game from Supabase schedules table */
+export type ScheduleGame = {
+  id: string;
+  gameId?: string;
+  gameDate: string | null;
+  gameDateTime: string | null;
+  gameTime: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamAbbrev: string;
+  awayTeamAbbrev: string;
+  venue: string | null;
+  timeDisplay: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  completed: boolean;
+};
+
+export type GameLogEntry = {
+  game_id: string;
+  game_date: string;
+  home_away: string;
+  win: boolean;
+  opponent_team_abbreviation: string;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  minutes: number;
+  field_goals_made: number;
+  field_goals_attempted: number;
+  three_point_made: number;
+  three_point_attempted: number;
+  free_throws_made: number;
+  free_throws_attempted: number;
+  turnovers: number;
+  fouls: number;
+  plus_minus: number;
+};
+
+export type ShotAttempt = {
+  x: number;
+  y: number;
+  made: boolean;
+  pts: number;
+};
+
+export type Player = {
+  athlete_id: string;
+  athlete_display_name: string;
+  athlete_short_name: string;
+  athlete_headshot_href: string;
+  athlete_position_name: string;
+  athlete_position_abbreviation: string;
+  /** Jersey number (e.g. "0"); shown as #0 in player list when present */
+  jersey_number?: string;
+  team_display_name: string;
+  team_abbreviation: string;
+  team_logo: string;
+  team_color: string;
+  games_played: number;
+  ppg: string;
+  rpg: string;
+  apg: string;
+  spg: string;
+  bpg: string;
+  tpg: string;
+  fpg: string;
+  mpg: string;
+  plus_minus?: string;
+  plus_minus_avg?: string;
+  fg_pct: string;
+  three_pt_pct: string;
+  ft_pct: string;
+  total_points: number;
+  total_rebounds: number;
+  total_assists: number;
+  total_steals: number;
+  total_blocks: number;
+  total_turnovers: number;
+  total_fouls: number;
+  total_minutes: number;
+  total_field_goals_made: number;
+  total_field_goals_attempted: number;
+  total_three_point_made: number;
+  total_three_point_attempted: number;
+  total_free_throws_made: number;
+  total_free_throws_attempted: number;
+  total_offensive_rebounds: number;
+  total_defensive_rebounds: number;
+  total_plus_minus: number;
+  game_log: GameLogEntry[];
+  shots?: ShotAttempt[];
+  /** Shooting insight ranks (from backend) */
+  pts_ft?: number;
+  pts_fg?: number;
+  pts_3pt?: number;
+  pct_pts_ft?: number;
+  pct_pts_fg?: number;
+  pct_pts_3pt?: number;
+  fga_rank?: number;
+  tpa_rank?: number;
+  fta_rank?: number;
+  pts_ft_rank?: number;
+  pts_fg_rank?: number;
+  pts_3pt_rank?: number;
+  pct_pts_ft_rank?: number;
+  pct_pts_fg_rank?: number;
+  pct_pts_3pt_rank?: number;
+  fg_acc_rank?: number;
+  three_acc_rank?: number;
+  ft_acc_rank?: number;
+  min_fga_90?: number;
+  min_3pa_90?: number;
+  min_fta_90?: number;
+};

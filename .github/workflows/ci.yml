@@ -1,45 +1,40 @@
-# .github/workflows/refresh-db.yml
-name: Refresh DB
+name: Deploy API
 
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: "0 14 * * *" # 9:00 AM EST (14:00 UTC) daily
-  workflow_dispatch:
-    inputs:
-      load_type:
-        description: "Full load or incremental loading of data"
-        required: false
-        default: "--incremental"
-        type: choice
-        options:
-          - "--incremental"
-          - "--full"
+    push:
+        branches: [main]
+        # paths:
+        #     - "bet_backend/**" # only deploy when backend code changes
 
 jobs:
-  run-r:
-    name: Refresh DB
-    runs-on: ubuntu-latest
-    environment: prod
+    deploy:
+        name: Deploy to DigitalOcean
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v5
 
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.4.0"
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get install -y libpq-dev libcurl4-openssl-dev libssl-dev
-          Rscript -e "install.packages(c('hoopR', 'dplyr', 'DBI', 'RPostgres'))"
-
-      - name: Run R script
-        env:
-          BET_DATABASE_URL: ${{ secrets.BET_DATABASE_URL }}
-        run: |
-          Rscript scripts/nba_data_to_db.r \
-            "${{ github.event.inputs.load_type || '--incremental' }}"
+            - name: Set up SSH
+              run: |
+                  mkdir -p ~/.ssh
+                  touch ~/.ssh/bet
+                  touch ~/.ssh/bet.pub
+                  touch ~/.ssh/known_hosts
+                  echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/bet
+                  echo "${{ secrets.DROPLET_SSH_PUBLIC_KEY }}" > ~/.ssh/bet.pub
+                  ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+                  ssh-copy-id -i ${{ secrets.DROPLET_SSH_PUBLIC_KEY }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_IP }}
+                  ${{ secrets.BET_SSH_PASSPHRASE }}
+            - name: Deploy to droplet
+              run: |
+                  ssh -i ${{ secrets.BET_SSH_KEY }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_IP }}
+                  ${{ secrets.BET_SSH_PASSPHRASE }}  
+                        # echo "${{ secrets.DROPLET_SSH_PUBLIC_KEY }}" > ~/.ssh/authorized_keys
+                        # chmod 700 ~/.ssh
+                        # chmod 600 ~/.ssh/authorized_keys
+                        # cd /root/bet &&
+                        # git pull origin main &&
+                        # go build -o api ./bet_backend/main.go &&
+                        # sudo systemctl restart api
+                      '

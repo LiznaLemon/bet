@@ -3,8 +3,6 @@ name: Deploy API
 on:
     push:
         branches: [main]
-        # paths:
-        #     - "bet_backend/**" # only deploy when backend code changes
 
 jobs:
     deploy:
@@ -13,22 +11,22 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v5
+              uses: actions/checkout@v4
 
             - name: Set up SSH
               run: |
                   mkdir -p ~/.ssh
-                  touch ~/.ssh/bet
-                  touch ~/.ssh/bet.pub
-                  touch ~/.ssh/known_hosts
                   echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/bet
-                  echo "${{ secrets.DROPLET_SSH_PUBLIC_KEY }}" > ~/.ssh/bet.pub
-                  chmod 700 ~/.ssh
                   chmod 600 ~/.ssh/bet
-                  chmod 600 ~/.ssh/bet.pub
-
                   ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+
             - name: Deploy to droplet
               run: |
-                  ssh -vvv -i ~/.ssh/bet ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_IP }}
-                  apt-get update && apt-get install -y golang git
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} '
+                    apt-get update && apt-get install -y golang git &&
+                    git clone https://github.com/yourusername/bet.git /root/bet || true &&
+                    cd /root/bet &&
+                    git pull origin main &&
+                    go build -o api ./bet_backend/main.go &&
+                    sudo systemctl restart api
+                  '

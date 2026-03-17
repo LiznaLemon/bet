@@ -23,10 +23,10 @@ jobs:
             - name: Deploy to droplet
               run: |
                   ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} '
-                    apt-get update && apt-get install -y golang git &&
-                    git clone https://github.com/LiznaLemon/bet.git /root/bet || true &&
                     cd /root/bet &&
                     git pull origin main &&
-                    go build -o api ./bet_backend/main.go &&
+                    cd bet_backend &&
+                    go mod download &&
+                    go build -o api . &&
                     sudo systemctl restart api
                   '

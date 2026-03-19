@@ -10,10 +10,14 @@ import {
   View,
 } from 'react-native';
 
-/** Number of days to show in the past */
-const DAYS_PAST = 7;
-/** Number of days to show in the future (stats less accurate for far future) */
-const DAYS_FUTURE = 5;
+/** Number of days to show in the past (scrollable calendar) */
+export const SCHEDULE_DAYS_PAST = 60;
+/** Number of days to show in the future (scrollable calendar) */
+export const SCHEDULE_DAYS_FUTURE = 60;
+/** Base fetch window: days behind today to fetch initially */
+export const SCHEDULE_FETCH_DAYS_PAST = 7;
+/** Base fetch window: days ahead of today to fetch initially */
+export const SCHEDULE_FETCH_DAYS_FUTURE = 7;
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const FADE_WIDTH = 24;
@@ -49,7 +53,7 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
 
   const dates = useMemo(() => {
     const out: string[] = [];
-    for (let i = -DAYS_PAST; i <= DAYS_FUTURE; i++) {
+    for (let i = -SCHEDULE_DAYS_PAST; i <= SCHEDULE_DAYS_FUTURE; i++) {
       out.push(getDateStrForOffset(i));
     }
     return out;

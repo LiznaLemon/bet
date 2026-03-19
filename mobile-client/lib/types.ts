@@ -14,6 +14,12 @@ export type ScheduleGame = {
   homeScore: number | null;
   awayScore: number | null;
   completed: boolean;
+  /** Team record as of game date (e.g. "45-30") */
+  homeRecord?: string | null;
+  awayRecord?: string | null;
+  /** True when team played on previous calendar day. */
+  homeBackToBack?: boolean;
+  awayBackToBack?: boolean;
 };
 
 export type GameLogEntry = {

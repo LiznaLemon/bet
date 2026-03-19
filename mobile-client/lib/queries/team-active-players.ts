@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { getAbbrevAliases } from '@/lib/utils/team-abbreviation';
 
 const EXCLUDED_GAME_IDS = ['401809839', '401838140', '401838141', '401838142', '401838143'];
 
@@ -12,10 +13,12 @@ export async function fetchTeamActivePlayerIds(
   const team = (teamAbbrev ?? '').trim();
   if (!team) return new Set();
 
+  const aliases = getAbbrevAliases(team);
+
   const { data: rows, error } = await supabase
     .from('player_boxscores_raw')
     .select('game_id, game_date, athlete_id')
-    .eq('team_abbreviation', team)
+    .in('team_abbreviation', aliases)
     .eq('season', season)
     .eq('season_type', 2)
     .or('did_not_play.is.null,did_not_play.eq.false')

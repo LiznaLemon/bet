@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Player } from '@/lib/types';
+import { getAbbrevAliases } from '@/lib/utils/team-abbreviation';
 
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -8,7 +9,9 @@ export async function fetchPlayersForTeams(
   season: number,
   teamAbbrevs: string[]
 ): Promise<Player[]> {
-  const teams = teamAbbrevs.filter(Boolean).map((t) => t.toUpperCase().trim());
+  const teams = teamAbbrevs
+    .filter(Boolean)
+    .flatMap((t) => getAbbrevAliases(t.toUpperCase().trim()));
   if (teams.length === 0) return [];
 
   const timeoutPromise = new Promise<never>((_, reject) => {

@@ -163,3 +163,98 @@ export function useLeagueStatVariance(season = 2026) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// --- Bundled matchup data (single RPC) ---
+
+import type { TeamDefensiveStats, TeamDefensiveStatsAllModes } from '@/lib/queries/team-defensive-stats';
+
+function mapDefensiveRow(row: Record<string, unknown>): TeamDefensiveStats {
+  return {
+    team_abbreviation: String(row.team_abbreviation ?? ''),
+    games_played: Number(row.games_played ?? 0),
+    pts_allowed_avg: Number(row.pts_allowed_avg ?? 0),
+    reb_allowed_avg: Number(row.reb_allowed_avg ?? 0),
+    ast_allowed_avg: Number(row.ast_allowed_avg ?? 0),
+    fg_pct_allowed: row.fg_pct_allowed != null ? Number(row.fg_pct_allowed) : null,
+    three_pt_pct_allowed: row.three_pt_pct_allowed != null ? Number(row.three_pt_pct_allowed) : null,
+    ft_pct_allowed: row.ft_pct_allowed != null ? Number(row.ft_pct_allowed) : null,
+    pts_allowed_rank: Number(row.pts_allowed_rank ?? 0),
+    reb_allowed_rank: Number(row.reb_allowed_rank ?? 0),
+    ast_allowed_rank: Number(row.ast_allowed_rank ?? 0),
+  };
+}
+
+export type GameMatchupBundle = {
+  teamOffensiveAllModes: TeamOffensiveStatsAllModes;
+  teamDefensiveAllModes: TeamDefensiveStatsAllModes;
+  leagueVariance: LeagueStatVariance | null;
+};
+
+export async function fetchGameMatchupBundle(season = 2026): Promise<GameMatchupBundle> {
+  const { data, error } = await supabase.rpc('get_game_matchup_bundle', {
+    p_season: season,
+    p_season_type: 2,
+  });
+
+  if (error) throw error;
+
+  const bundle = Array.isArray(data) ? data[0]?.bundle : (data as { bundle: Record<string, unknown> })?.bundle;
+  if (!bundle) throw new Error('Empty matchup bundle');
+
+  const offRows = (bundle.team_offensive_all_modes ?? []) as Array<Record<string, unknown> & { mode: string }>;
+  const offSeason: TeamOffensiveStats[] = [];
+  const offLast10: TeamOffensiveStats[] = [];
+  const offLast5: TeamOffensiveStats[] = [];
+  for (const row of offRows) {
+    const mapped = mapRpcRow(row);
+    if (row.mode === 'season') offSeason.push(mapped);
+    else if (row.mode === 'last_10') offLast10.push(mapped);
+    else if (row.mode === 'last_5') offLast5.push(mapped);
+  }
+
+  const defRows = (bundle.team_defensive_all_modes ?? []) as Array<Record<string, unknown> & { mode: string }>;
+  const defSeason: TeamDefensiveStats[] = [];
+  const defLast10: TeamDefensiveStats[] = [];
+  const defLast5: TeamDefensiveStats[] = [];
+  for (const row of defRows) {
+    const mapped = mapDefensiveRow(row);
+    if (row.mode === 'season') defSeason.push(mapped);
+    else if (row.mode === 'last_10') defLast10.push(mapped);
+    else if (row.mode === 'last_5') defLast5.push(mapped);
+  }
+
+  const lv = bundle.league_variance as Record<string, unknown> | null;
+  const leagueVariance = lv
+    ? {
+        pts_std: Number(lv.pts_std ?? 0),
+        reb_std: Number(lv.reb_std ?? 0),
+        ast_std: Number(lv.ast_std ?? 0),
+        stl_std: Number(lv.stl_std ?? 0),
+        blk_std: Number(lv.blk_std ?? 0),
+        tov_std: Number(lv.tov_std ?? 0),
+        fg_pct_std: Number(lv.fg_pct_std ?? 0),
+        three_pt_pct_std: Number(lv.three_pt_pct_std ?? 0),
+        ft_pct_std: Number(lv.ft_pct_std ?? 0),
+        pts_allowed_std: Number(lv.pts_allowed_std ?? 0),
+        reb_allowed_std: Number(lv.reb_allowed_std ?? 0),
+        ast_allowed_std: Number(lv.ast_allowed_std ?? 0),
+        fg_pct_allowed_std: Number(lv.fg_pct_allowed_std ?? 0),
+        three_pt_pct_allowed_std: Number(lv.three_pt_pct_allowed_std ?? 0),
+        ft_pct_allowed_std: Number(lv.ft_pct_allowed_std ?? 0),
+      }
+    : null;
+
+  return {
+    teamOffensiveAllModes: { season: offSeason, last10: offLast10, last5: offLast5 },
+    teamDefensiveAllModes: { season: defSeason, last10: defLast10, last5: defLast5 },
+    leagueVariance,
+  };
+}
+
+export function useGameMatchupBundle(season = 2026) {
+  return useQuery({
+    queryKey: ['game-matchup-bundle', season],
+    queryFn: () => fetchGameMatchupBundle(season),
+    staleTime: 5 * 60 * 1000,
+  });
+}

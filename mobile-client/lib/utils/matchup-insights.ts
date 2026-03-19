@@ -2,7 +2,6 @@ import type { GameLogEntry, Player, ScheduleGame } from '@/lib/types';
 import type { TeamRecentResults } from '@/lib/queries/schedule';
 import type { TeamDefensiveStats } from '@/lib/queries/team-defensive-stats';
 import type { TeamOffensiveStats } from '@/lib/queries/team-offensive-stats';
-import { getPrevDayDateStr } from '@/lib/utils/date';
 import { getAbbrevAliases } from '@/lib/utils/team-abbreviation';
 
 function teamMatches(teamAbbrev: string, gameAbbrev: string): boolean {
@@ -16,28 +15,13 @@ type GameInfo = {
   gameDate?: string | null;
 };
 
-function getBackToBackInsights(
-  game: GameInfo,
-  schedule: ScheduleGame[]
-): string[] {
+function getBackToBackInsights(game: GameInfo): string[] {
   const insights: string[] = [];
-  const gameDate = game.gameDate ?? null;
-  if (!gameDate) return insights;
-  const prevDay = getPrevDayDateStr(gameDate);
-  if (!prevDay) return insights;
-  for (const teamKey of ['awayTeamAbbrev', 'homeTeamAbbrev'] as const) {
-    const abbrev = game[teamKey] ?? '';
-    if (!abbrev) continue;
-    const aliases = getAbbrevAliases(abbrev.toUpperCase().trim());
-    const playedPrevDay = schedule.some((g) => {
-      if ((g.gameDate ?? '') !== prevDay) return false;
-      const homeMatch = aliases.includes((g.homeTeamAbbrev ?? '').toUpperCase().trim());
-      const awayMatch = aliases.includes((g.awayTeamAbbrev ?? '').toUpperCase().trim());
-      return homeMatch || awayMatch;
-    });
-    if (playedPrevDay) {
-      insights.push(`${abbrev} is playing back-to-back.`);
-    }
+  if ((game as ScheduleGame).awayBackToBack) {
+    insights.push(`${game.awayTeamAbbrev} is playing back-to-back.`);
+  }
+  if ((game as ScheduleGame).homeBackToBack) {
+    insights.push(`${game.homeTeamAbbrev} is playing back-to-back.`);
   }
   return insights;
 }
@@ -271,8 +255,7 @@ export function computeTeamMatchupInsights(
   teamOffensiveLast5: TeamOffensiveStats[],
   teamDefense: TeamDefensiveStats[],
   awayRecentResults: TeamRecentResults,
-  homeRecentResults: TeamRecentResults,
-  schedule: ScheduleGame[] = []
+  homeRecentResults: TeamRecentResults
 ): string[] {
   const awayAbbrev = game.awayTeamAbbrev ?? '';
   const homeAbbrev = game.homeTeamAbbrev ?? '';
@@ -285,7 +268,7 @@ export function computeTeamMatchupInsights(
   const homeStreak = getStreakInsight(homeAbbrev, homeRecentResults);
   if (homeStreak) insights.push(homeStreak);
 
-  insights.push(...getBackToBackInsights(game, schedule));
+  insights.push(...getBackToBackInsights(game));
 
   insights.push(...getTeamStrengthInsights(awayAbbrev, homeAbbrev, teamDefense, teamOffensiveSeason));
   insights.push(...getOffensiveSlumpInsight(awayAbbrev, homeAbbrev, teamOffensiveSeason, teamOffensiveLast5));

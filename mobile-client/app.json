@@ -8,6 +8,7 @@
     "scheme": "sportsstats",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rlemon285.sports-stats"

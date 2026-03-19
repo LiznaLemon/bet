@@ -56,6 +56,8 @@ export default function ExploreScreen() {
           players={players}
           isLoading={playersLoading}
           onAddProp={handleAddProp}
+          hideTitle={true}
+          paginationSeason={2026}
         />
 
         <View style={styles.propsSection}>
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   header: {
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   title: {
     marginBottom: 4,

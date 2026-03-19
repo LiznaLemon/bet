@@ -1,0 +1,4 @@
+-- get_similar_players RPC: server-side player similarity with euclidean distance
+-- See MCP-applied migration for full source
+-- Parameters: p_athlete_id, p_opponent_abbrev, p_season, p_season_type, p_k
+-- Returns: similar players with their games vs opponent

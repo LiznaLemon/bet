@@ -750,7 +750,66 @@ export default function PlayerDetailScreen() {
   const { data: scheduleData = [] } = useSchedule();
   const { data: fetchedShots = [], isLoading: shotsLoading } = useShots(id, 2026);
 
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('season');
+  const statsOverlayOpacity = useSharedValue(0);
+  const isInitialMount = useRef(true);
+  const [chartStat, setChartStat] = useState<ChartStatKey>('points');
+  const statSections = useMemo(() => getStatSections(), []);
+  const { width: screenWidth } = useWindowDimensions();
+
   const player = (playersData as EnhancedPlayer[]).find((p) => p.athlete_id === id);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    statsOverlayOpacity.value = withSequence(
+      withTiming(0.35, { duration: 80, easing: Easing.out(Easing.ease) }),
+      withTiming(0, { duration: 180, easing: Easing.inOut(Easing.ease) }),
+    );
+  }, [timePeriod]);
+
+  const gameLog = player ? ((player.game_log ?? []) as GameLogEntry[]) : [];
+
+  const seasonPerGame = useMemo(() => {
+    if (!player) return { data: [], labels: [] };
+    const log = (player.game_log ?? []) as GameLogEntry[];
+    const reversed = [...log].reverse();
+    const data = reversed.map((g) => getStatFromGame(g, chartStat));
+    const labels = reversed.map((g) => (g.opponent_team_abbreviation ?? '—').toUpperCase());
+    return { data, labels };
+  }, [player?.game_log, chartStat]);
+
+  const allPlayers = useMemo(
+    () => (playersData as EnhancedPlayer[]),
+    [playersData]
+  );
+
+  const trendInsights = useMemo(
+    () => {
+      if (!player) return [];
+      return computeTrendInsights(
+        gameLog,
+        chartStat,
+        typeof player.team_abbreviation === 'string' ? player.team_abbreviation : undefined,
+        scheduleData,
+        player,
+        allPlayers
+      );
+    },
+    [gameLog, chartStat, player, player?.team_abbreviation, scheduleData, allPlayers]
+  );
+
+  const averageInsights = useMemo(
+    () => player ? computeAverageInsights(player, allPlayers) : [],
+    [player, allPlayers]
+  );
+
+  const shootingInsights = useMemo(
+    () => player ? getShootingInsights(player) : [],
+    [player]
+  );
 
   if (playersLoading) {
     return (
@@ -771,25 +830,6 @@ export default function PlayerDetailScreen() {
   const isEnhanced = 'quarter_averages' in player && player.quarter_averages;
   const teamColor = player.team_color ? `#${player.team_color}` : '#552583';
 
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('season');
-  const statsOverlayOpacity = useSharedValue(0);
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    statsOverlayOpacity.value = withSequence(
-      withTiming(0.35, { duration: 80, easing: Easing.out(Easing.ease) }),
-      withTiming(0, { duration: 180, easing: Easing.inOut(Easing.ease) }),
-    );
-  }, [timePeriod]);
-
-  const [chartStat, setChartStat] = useState<ChartStatKey>('points');
-  const statSections = useMemo(() => getStatSections(), []);
-
-  // RPC may include shots; use embedded when non-empty, else fetched from useShots (RPC returns [] to reduce payload)
   const embeddedShots = ('shots' in player && Array.isArray((player as { shots?: ShotAttempt[] }).shots))
     ? ((player as { shots: ShotAttempt[] }).shots ?? [])
     : [];
@@ -802,16 +842,7 @@ export default function PlayerDetailScreen() {
         ? (player as { last_10?: { games?: number } }).last_10?.games ?? 10
         : player.games_played;
 
-  const gameLog = (player.game_log ?? []) as GameLogEntry[];
-
-  // Season: per-game values, chronological (oldest left, newest right) for horizontal scroll
-  const seasonPerGame = useMemo(() => {
-    const log = (player.game_log ?? []) as GameLogEntry[];
-    const reversed = [...log].reverse(); // oldest first
-    const data = reversed.map((g) => getStatFromGame(g, chartStat));
-    const labels = reversed.map((g) => (g.opponent_team_abbreviation ?? '—').toUpperCase());
-    return { data, labels };
-  }, [player.game_log, chartStat]);
+  const seasonBarWidth = Math.max(28, Math.floor((screenWidth - 48) / 10) - 3);
 
   const chartStatLabels: Record<typeof chartStat, string> = {
     points: 'Points',
@@ -822,38 +853,6 @@ export default function PlayerDetailScreen() {
     three_pt_made: 'Threes Made',
     free_throws_made: 'Free Throws Made',
   };
-
-  const { width: screenWidth } = useWindowDimensions();
-  // ~10 bars visible: account for section + chartCard padding (~48px total)
-  const seasonBarWidth = Math.max(28, Math.floor((screenWidth - 48) / 10) - 3);
-
-  const allPlayers = useMemo(
-    () => (playersData as EnhancedPlayer[]),
-    [playersData]
-  );
-
-  const trendInsights = useMemo(
-    () =>
-      computeTrendInsights(
-        gameLog,
-        chartStat,
-        typeof player.team_abbreviation === 'string' ? player.team_abbreviation : undefined,
-        scheduleData,
-        player,
-        allPlayers
-      ),
-    [gameLog, chartStat, player, player.team_abbreviation, scheduleData, allPlayers]
-  );
-
-  const averageInsights = useMemo(
-    () => computeAverageInsights(player, allPlayers),
-    [player, allPlayers]
-  );
-
-  const shootingInsights = useMemo(
-    () => getShootingInsights(player),
-    [player]
-  );
 
   return (
     <ThemedView style={styles.container}>

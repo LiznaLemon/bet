@@ -21,6 +21,12 @@ export type HitRateResult = {
   hitRate: number;
 };
 
+export type HitRateWindows = {
+  season: HitRateResult;
+  l10: HitRateResult | null;
+  l5: HitRateResult | null;
+};
+
 function checkSinglePropHit(g: GameLogEntry, prop: SingleProp): boolean {
   const val = getStatFromGameLog(g, prop.stat);
   if (prop.direction === 'over') {
@@ -52,6 +58,22 @@ export function computeHitRate(gameLog: GameLogEntry[], prop: PlayerProp): HitRa
     totalGames,
     hitRate: totalGames > 0 ? hitCount / totalGames : 0,
   };
+}
+
+export function sortGameLogNewestFirst(gameLog: GameLogEntry[]): GameLogEntry[] {
+  return [...gameLog].sort((a, b) => {
+    const dateCmp = String(b.game_date ?? '').localeCompare(String(a.game_date ?? ''));
+    if (dateCmp !== 0) return dateCmp;
+    return String(b.game_id ?? '').localeCompare(String(a.game_id ?? ''));
+  });
+}
+
+export function computeHitRatesByWindow(gameLog: GameLogEntry[], prop: PlayerProp): HitRateWindows {
+  const sorted = sortGameLogNewestFirst(gameLog);
+  const season = computeHitRate(sorted, prop);
+  const l10 = sorted.length >= 10 ? computeHitRate(sorted.slice(0, 10), prop) : null;
+  const l5 = sorted.length >= 5 ? computeHitRate(sorted.slice(0, 5), prop) : null;
+  return { season, l10, l5 };
 }
 
 /** Count games where ALL given props hit in the same game. */
@@ -156,7 +178,7 @@ export function computePropInsights(
   otherPropsForSamePlayer: PlayerProp[] = []
 ): string[] {
   const insights: string[] = [];
-  const gameLog = (player.game_log ?? []) as GameLogEntry[];
+  const gameLog = sortGameLogNewestFirst((player.game_log ?? []) as GameLogEntry[]);
   if (gameLog.length === 0) return insights;
 
   insights.push(

@@ -1,22 +1,23 @@
 import { GameMatchupDisplay } from '@/components/game-matchup-display';
-import { ScheduleDateFilter } from '@/components/schedule-date-filter';
+import {
+  SCHEDULE_FETCH_DAYS_FUTURE,
+  SCHEDULE_FETCH_DAYS_PAST,
+  ScheduleDateFilter,
+} from '@/components/schedule-date-filter';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { getGamesForDate, type ScheduleGame } from '@/constants/schedule';
-import { getTeamColor } from '@/constants/team-colors';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { fetchPlayers } from '@/lib/queries/players';
-import { useSchedule } from '@/lib/queries/schedule';
+import { useScheduleForSelectedDate } from '@/lib/queries/schedule';
 import { getLocalDateStr } from '@/lib/utils/date';
-import { useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
@@ -35,13 +36,12 @@ function formatMonthYear(dateStr: string): string {
 function GameCard({
   game,
   colorScheme,
+  scheduleGames,
 }: {
   game: ScheduleGame;
   colorScheme: 'light' | 'dark';
+  scheduleGames: ScheduleGame[];
 }) {
-  const awayColor = getTeamColor(game.awayTeamAbbrev);
-  const homeColor = getTeamColor(game.homeTeamAbbrev);
-
   return (
     <Pressable
       style={({ pressed }) => [
@@ -49,16 +49,12 @@ function GameCard({
         pressed && styles.gameCardPressed,
       ]}
       onPress={() => router.push(`/game/${game.id}`)}>
-      <LinearGradient
-        colors={[awayColor, 'transparent', 'transparent', homeColor]}
-        locations={[0, 0.4, 0.6, 1]}
-        start={{ x: -0.6, y: 0.5 }}
-        end={{ x: 1.6, y: 0.5 }}
-        style={[StyleSheet.absoluteFill, { opacity: 0.75 }]}
-        pointerEvents="none"
-      />
       <View style={styles.gameCardContent}>
-        <GameMatchupDisplay game={game} colorScheme={colorScheme} />
+        <GameMatchupDisplay
+          game={game}
+          colorScheme={colorScheme}
+          scheduleGames={scheduleGames}
+        />
       </View>
     </Pressable>
   );
@@ -66,16 +62,12 @@ function GameCard({
 
 export default function ScheduleScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const queryClient = useQueryClient();
-  const { data: scheduleData = [], isLoading } = useSchedule();
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateStr());
-
-  useEffect(() => {
-    queryClient.prefetchQuery({
-      queryKey: ['players', 2026],
-      queryFn: () => fetchPlayers(2026),
-    });
-  }, [queryClient]);
+  const { data: scheduleData = [], isLoading, refetch, isRefetching } = useScheduleForSelectedDate(
+    selectedDate,
+    2026,
+    { daysPast: SCHEDULE_FETCH_DAYS_PAST, daysFuture: SCHEDULE_FETCH_DAYS_FUTURE }
+  );
 
   const games = useMemo(() => {
     return getGamesForDate(scheduleData, selectedDate);
@@ -110,7 +102,21 @@ export default function ScheduleScreen() {
           data={games}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => <GameCard game={item} colorScheme={colorScheme} />}
+          renderItem={({ item }) => (
+            <GameCard
+              game={item}
+              colorScheme={colorScheme}
+              scheduleGames={scheduleData}
+            />
+          )}
+          windowSize={5}
+          maxToRenderPerBatch={4}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching && !isLoading}
+              onRefresh={() => refetch()}
+            />
+          }
         />
       )}
     </ThemedView>

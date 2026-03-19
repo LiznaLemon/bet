@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
-import type { Player } from '@/lib/types';
+import type { GameLogEntry, Player } from '@/lib/types';
 
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -43,13 +44,14 @@ export type PlayerStatRanks = {
   apg_rank: number;
   spg_rank: number;
   bpg_rank: number;
+  /** 3PT made per game rank (from get_player_stat_ranks migration 20250321) */
+  three_pm_rank?: number;
 };
 
 export async function fetchPlayerStatRanks(
   season: number,
   athleteIds: string[]
 ): Promise<Record<string, PlayerStatRanks>> {
-  if (athleteIds.length === 0) return {};
   const { data, error } = await supabase.rpc('get_player_stat_ranks', {
     p_season: season,
     p_season_type: 2,
@@ -66,9 +68,115 @@ export async function fetchPlayerStatRanks(
 export function usePlayerStatRanks(season: number, athleteIds: string[]) {
   const ids = [...new Set(athleteIds)].filter(Boolean).sort();
   return useQuery({
-    queryKey: ['player-stat-ranks', season, ids],
+    queryKey: ['player-stat-ranks', season, ids.length === 0 ? 'all' : ids],
     queryFn: () => fetchPlayerStatRanks(season, ids),
-    enabled: ids.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// --- Paginated players ---
+
+const PLAYERS_PAGE_SIZE = 25;
+
+export type PaginatedPlayer = Player & {
+  recent_game_log: { points: number; rebounds: number; assists: number; steals: number; blocks: number; three_point_made: number }[];
+  total_count: number;
+  qualified?: boolean;
+  /** League-wide rank for the current sort stat (1-based). From get_players_paginated. */
+  stat_rank?: number;
+};
+
+type PaginatedPlayersPage = {
+  players: PaginatedPlayer[];
+  totalCount: number;
+  nextOffset: number | undefined;
+};
+
+async function fetchPlayersPaginated(
+  season: number,
+  search: string | null,
+  sortBy: string,
+  offset: number
+): Promise<PaginatedPlayersPage> {
+  const { data, error } = await supabase.rpc('get_players_paginated', {
+    p_season: season,
+    p_season_type: 2,
+    p_search: search || null,
+    p_sort_by: sortBy,
+    p_sort_dir: 'desc',
+    p_offset: offset,
+    p_limit: PLAYERS_PAGE_SIZE,
+  });
+
+  if (error) throw new Error(error.message || 'Failed to load players');
+
+  const rows = (data ?? []) as PaginatedPlayer[];
+  const totalCount = rows[0]?.total_count ?? 0;
+  const hasMore = offset + rows.length < totalCount;
+
+  return {
+    players: rows,
+    totalCount,
+    nextOffset: hasMore ? offset + PLAYERS_PAGE_SIZE : undefined,
+  };
+}
+
+export function usePlayersPaginated(
+  season: number,
+  search: string,
+  sortBy: string,
+  enabled = true
+) {
+  return useInfiniteQuery({
+    queryKey: ['players-paginated', season, search || null, sortBy],
+    queryFn: ({ pageParam = 0 }) =>
+      fetchPlayersPaginated(season, search, sortBy, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    staleTime: 5 * 60 * 1000,
+    enabled,
+  });
+}
+
+/** Prefetch first page of players (e.g. at app open) so Players tab loads from cache. */
+export function prefetchPlayersFirstPage(season = 2026, sortBy = 'ppg') {
+  return queryClient.prefetchInfiniteQuery({
+    queryKey: ['players-paginated', season, null, sortBy],
+    queryFn: ({ pageParam = 0 }) =>
+      fetchPlayersPaginated(season, null, sortBy, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// --- On-demand game log ---
+
+export async function fetchPlayerGameLog(
+  athleteId: string,
+  season: number,
+  limit = 82
+): Promise<GameLogEntry[]> {
+  const { data, error } = await supabase.rpc('get_player_game_log', {
+    p_athlete_id: athleteId,
+    p_season: season,
+    p_season_type: 2,
+    p_limit: limit,
+  });
+
+  if (error) throw new Error(error.message || 'Failed to load game log');
+  return (data ?? []) as GameLogEntry[];
+}
+
+export function usePlayerGameLog(
+  athleteId: string | undefined,
+  season = 2026,
+  limit = 82
+) {
+  return useQuery({
+    queryKey: ['player-game-log', athleteId, season, limit],
+    queryFn: () => fetchPlayerGameLog(athleteId!, season, limit),
+    enabled: !!athleteId,
     staleTime: 5 * 60 * 1000,
   });
 }

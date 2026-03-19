@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ScheduleGame } from '@/lib/types';
+import { getDateStrForOffset } from '@/lib/utils/date';
 import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 
 const EXCLUDED_GAME_IDS = ['401809839', '401838140', '401838141', '401838142', '401838143'];
@@ -11,12 +12,69 @@ function extractGameTime(shortDetail: string | null): string | null {
   return parts.length > 1 ? parts[1].trim() : shortDetail;
 }
 
+/** Normalize game_date to YYYY-MM-DD. Use raw string when already in that format.
+ * Use America/New_York for timestamps (NBA convention) to avoid UTC shifting late-night games to next day. */
+function toGameDateStr(val: unknown): string | null {
+  if (val == null) return null;
+  const s = String(val);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  try {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  } catch {
+    return null;
+  }
+}
+
+/** Derive YYYY-MM-DD from timestamp in America/New_York (NBA convention). Use when game_date is null. */
+function toGameDateStrFromDateTime(dateTime: unknown): string | null {
+  if (dateTime == null) return null;
+  try {
+    const d = new Date(String(dateTime));
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  } catch {
+    return null;
+  }
+}
+
+/** Parse home_records/away_records from DB. Can be JSON array with overall/total summary, or plain "W-L" string. */
+function parseTeamRecord(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (/^\d+-\d+$/.test(trimmed)) return trimmed;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        const total = parsed.find(
+          (p: { type?: string; name?: string }) => p?.type === 'total' || p?.name === 'overall'
+        ) as { summary?: string } | undefined;
+        return total?.summary ?? null;
+      }
+      const obj = parsed as { summary?: string };
+      return obj?.summary ?? null;
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(raw)) {
+    const total = raw.find(
+      (p: { type?: string; name?: string }) => p?.type === 'total' || p?.name === 'overall'
+    ) as { summary?: string } | undefined;
+    return total?.summary ?? null;
+  }
+  return null;
+}
+
 function mapRowToScheduleGame(row: Record<string, unknown>): ScheduleGame {
   const shortDetail = (row.status_type_short_detail as string) ?? null;
+  const gameDate = toGameDateStr(row.game_date) ?? toGameDateStrFromDateTime(row.game_date_time);
   return {
     id: String(row.game_id ?? ''),
     gameId: String(row.game_id ?? ''),
-    gameDate: row.game_date ? new Date(row.game_date as string).toISOString().slice(0, 10) : null,
+    gameDate,
     gameDateTime: row.game_date_time ? new Date(row.game_date_time as string).toISOString() : null,
     gameTime: extractGameTime(shortDetail),
     homeTeam: (row.home_display_name as string) ?? '',
@@ -28,45 +86,85 @@ function mapRowToScheduleGame(row: Record<string, unknown>): ScheduleGame {
     homeScore: row.home_score != null ? Number(row.home_score) : null,
     awayScore: row.away_score != null ? Number(row.away_score) : null,
     completed: Boolean(row.status_type_completed),
+    homeRecord: parseTeamRecord(row.home_records),
+    awayRecord: parseTeamRecord(row.away_records),
   };
 }
 
-async function fetchSchedule(season: number): Promise<ScheduleGame[]> {
-  const { data, error } = await supabase
-    .from('schedules')
-    .select(
-      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score'
-    )
-    .eq('season', season)
-    .eq('season_type', 2)
-    .not('home_abbreviation', 'is', null)
-    .neq('home_abbreviation', 'TBD')
-    .order('game_date', { ascending: true })
-    .order('game_date_time', { ascending: true });
+function mapEnrichedRowToScheduleGame(row: Record<string, unknown>): ScheduleGame {
+  const game = mapRowToScheduleGame(row);
+  game.homeBackToBack = Boolean(row.home_back_to_back);
+  game.awayBackToBack = Boolean(row.away_back_to_back);
+  return game;
+}
+
+async function fetchScheduleEnriched(
+  season: number,
+  dateRange?: { startDate: string; endDate: string }
+): Promise<ScheduleGame[]> {
+  const { data, error } = await supabase.rpc('get_schedule_enriched', {
+    p_season: season,
+    p_start_date: dateRange?.startDate ?? null,
+    p_end_date: dateRange?.endDate ?? null,
+  });
 
   if (error) throw error;
-
-  // Filter out excluded game IDs (Supabase doesn't support NOT IN with array easily)
-  const filtered = (data ?? []).filter(
-    (row) => !EXCLUDED_GAME_IDS.includes(String(row.game_id))
-  );
-
-  return filtered.map(mapRowToScheduleGame);
+  return (data ?? []).map((row: Record<string, unknown>) => mapEnrichedRowToScheduleGame(row));
 }
 
 export function useSchedule(season = 2026) {
   return useQuery({
     queryKey: ['schedule', season],
-    queryFn: () => fetchSchedule(season),
-    staleTime: 5 * 60 * 1000,
+    queryFn: () => fetchScheduleEnriched(season),
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
   });
+}
+
+/** Fetches schedule for a date range with B2B flags computed server-side. */
+export function useScheduleForDateRange(
+  startDate: string,
+  endDate: string,
+  season = 2026,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ['schedule', season, startDate, endDate],
+    queryFn: () => fetchScheduleEnriched(season, { startDate, endDate }),
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export type ScheduleFetchWindow = {
+  daysPast: number;
+  daysFuture: number;
+};
+
+/**
+ * Fetches schedule for a range that includes selectedDate: base window (today ± daysPast/Future)
+ * when selectedDate is within it, or expands to include selectedDate when scrolled outside.
+ */
+export function useScheduleForSelectedDate(
+  selectedDate: string,
+  season: number,
+  window: ScheduleFetchWindow
+) {
+  const baseStart = getDateStrForOffset(-window.daysPast);
+  const baseEnd = getDateStrForOffset(window.daysFuture);
+
+  const startDate = selectedDate < baseStart ? selectedDate : baseStart;
+  const endDate = selectedDate > baseEnd ? selectedDate : baseEnd;
+
+  return useScheduleForDateRange(startDate, endDate, season);
 }
 
 export async function fetchGameById(gameId: string, season = 2026): Promise<ScheduleGame | null> {
   const { data, error } = await supabase
     .from('schedules')
     .select(
-      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score'
+      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score, home_records, away_records'
     )
     .eq('game_id', gameId)
     .eq('season', season)
@@ -88,7 +186,7 @@ export function useGame(gameId: string | undefined, season = 2026) {
   });
 }
 
-/** Fetches completed games this season between the two teams (either home/away order). Excludes excludeGameId. */
+/** Fetches completed games this season between the two teams via DB-side filtering RPC. */
 export async function fetchPreviousMatchups(
   homeAbbrev: string,
   awayAbbrev: string,
@@ -99,37 +197,16 @@ export async function fetchPreviousMatchups(
   const away = (awayAbbrev ?? '').trim();
   if (!home || !away) return [];
 
-  const { data, error } = await supabase
-    .from('schedules')
-    .select(
-      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score'
-    )
-    .eq('season', season)
-    .eq('season_type', 2)
-    .eq('status_type_completed', true)
-    .not('home_score', 'is', null)
-    .not('away_score', 'is', null)
-    .order('game_date', { ascending: false });
+  const { data, error } = await supabase.rpc('get_previous_matchups', {
+    p_home_abbrev: home,
+    p_away_abbrev: away,
+    p_season: season,
+    p_exclude_game_id: excludeGameId ?? null,
+  });
 
   if (error) throw error;
 
-  const homeAliases = getAbbrevAliases(home);
-  const awayAliases = getAbbrevAliases(away);
-  const exclude = excludeGameId ? String(excludeGameId) : null;
-
-  const filtered = (data ?? []).filter((row) => {
-    if (EXCLUDED_GAME_IDS.includes(String(row.game_id))) return false;
-    if (exclude && String(row.game_id) === exclude) return false;
-    const h = String(row.home_abbreviation ?? '').toUpperCase();
-    const a = String(row.away_abbreviation ?? '').toUpperCase();
-    const homeMatch = homeAliases.includes(h);
-    const awayMatch = awayAliases.includes(a);
-    const swappedHomeMatch = awayAliases.includes(h);
-    const swappedAwayMatch = homeAliases.includes(a);
-    return (homeMatch && awayMatch) || (swappedHomeMatch && swappedAwayMatch);
-  });
-
-  return filtered.map((row) => mapRowToScheduleGame(row as Record<string, unknown>));
+  return (data ?? []).map((row: Record<string, unknown>) => mapRowToScheduleGame(row));
 }
 
 export function usePreviousMatchups(

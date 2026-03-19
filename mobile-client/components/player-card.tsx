@@ -1,6 +1,7 @@
 import { MiniBarChart } from '@/components/mini-bar-chart';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, useMemo } from 'react';
@@ -34,6 +35,10 @@ interface PlayerCardProps {
   sortBy: SortOption;
   colorScheme: 'light' | 'dark';
   layout?: 'default' | 'compact' | 'detailed' | 'wide' | 'long';
+  /** 1-based rank in the list (e.g. 1, 2, 3). When provided, shows a small number to the left of the player name. */
+  rank?: number;
+  /** Whether the player meets the games-played qualification threshold. When false, the card is dimmed. */
+  qualified?: boolean;
   /** Increment to trigger bar chart intro animation (e.g. from useFocusEffect) */
   animationTrigger?: number;
   /** Skip bar chart animation (e.g. when remounting recycled list items) */
@@ -47,6 +52,8 @@ function PlayerCardComponent({
   sortBy, 
   colorScheme,
   layout = 'default',
+  rank,
+  qualified = true,
   animationTrigger,
   skipChartAnimation,
   onChartAnimationComplete,
@@ -81,7 +88,14 @@ function PlayerCardComponent({
             contentFit="cover"
           />
           <View style={styles.playerDetails}>
-            <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            <View style={styles.nameRow}>
+              <View style={styles.rankSlot}>
+                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                  {rank != null ? `${rank}.` : '–'}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            </View>
             <ThemedText style={styles.statAverage}>
               {currentStatValue} {statLabel}
             </ThemedText>
@@ -116,9 +130,16 @@ function PlayerCardComponent({
           contentFit="cover"
         />
         <View style={styles.compactInfo}>
-          <ThemedText style={styles.playerNameCompact}>{player.athlete_display_name}</ThemedText>
+          <View style={styles.nameRow}>
+            <View style={styles.rankSlot}>
+              <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                {rank != null ? `${rank}.` : '–'}
+              </ThemedText>
+            </View>
+            <ThemedText style={styles.playerNameCompact}>{player.athlete_display_name}</ThemedText>
+          </View>
           <ThemedText style={styles.teamText}>
-            {player.team_abbreviation} • {player.athlete_position_abbreviation}
+            {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
           </ThemedText>
         </View>
         <View style={styles.compactStat}>
@@ -145,9 +166,16 @@ function PlayerCardComponent({
             contentFit="cover"
           />
           <View style={styles.detailedInfo}>
-            <ThemedText style={styles.playerNameDetailed}>{player.athlete_display_name}</ThemedText>
+            <View style={styles.nameRow}>
+              <View style={styles.rankSlot}>
+                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                  {rank != null ? `${rank}.` : '–'}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.playerNameDetailed}>{player.athlete_display_name}</ThemedText>
+            </View>
             <ThemedText style={styles.teamTextDetailed}>
-              {player.team_abbreviation} • {player.athlete_position_abbreviation}
+              {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
             </ThemedText>
             <ThemedText style={styles.gamesPlayedText}>{player.games_played} Games</ThemedText>
           </View>
@@ -192,7 +220,14 @@ function PlayerCardComponent({
             contentFit="cover"
           />
           <View style={styles.playerDetails}>
-            <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            <View style={styles.nameRow}>
+              <View style={styles.rankSlot}>
+                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                  {rank != null ? `${rank}.` : '–'}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            </View>
             <ThemedText style={styles.statAverage}>
               {currentStatValue} {statLabel}
             </ThemedText>
@@ -209,13 +244,7 @@ function PlayerCardComponent({
       <TouchableOpacity
         style={[
           styles.playerCardLong,
-          { 
-            // paddingBottom: 8, 
-            // borderBottomWidth: 1, 
-            // borderBottomColor: Colors[colorScheme].border,
-            // backgroundColor: Colors[colorScheme].cardBackground,
-          },
-          // { backgroundColor: Colors[colorScheme].cardBackground },
+          !qualified && { opacity: 0.45 },
         ]}
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
         {/* Player Image */}
@@ -236,14 +265,19 @@ function PlayerCardComponent({
         <View style={styles.longContentContainer}>
           {/* Name and Stat in Row */}
           <View style={styles.longHeaderRow}>
-            <ThemedText style={styles.playerNameLong}>
+            <View style={styles.nameRow}>
+              <View style={styles.rankSlot}>
+                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                  {rank != null ? `${rank}.` : '–'}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.playerNameLong}>
               {player.athlete_display_name}
               <ThemedText style={styles.playerNameTeam}>
-                {' | '}
-                {player.jersey_number != null ? `#${player.jersey_number} | ` : ''}
-                {player.athlete_position_abbreviation} | {player.team_abbreviation}
+                {' '}({toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation})
               </ThemedText>
             </ThemedText>
+          </View>
           </View>
           
           {/* Bar Chart */}
@@ -292,6 +326,18 @@ const styles = StyleSheet.create({
   playerDetails: {
     marginLeft: 12,
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rankSlot: {
+    minWidth: 24,
+  },
+  rankNumber: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   playerName: {
     fontSize: 16,

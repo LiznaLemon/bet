@@ -1,3 +1,8 @@
+/**
+ * PropProgressLine - Temporarily replaced by RiveProgressBar (rive-progress-bar.tsx).
+ * Kept for potential rollback. The Rive progress bar (progress-bar.riv) is now used
+ * in game-live-view.tsx instead.
+ */
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { memo, useEffect } from 'react';
@@ -43,7 +48,7 @@ const TARGET_POSITION_PCT = 80;
 /** Max value above target for the overflow zone (80-100%). Values above target + this fraction cap at 100%. */
 const OVERFLOW_RANGE_MULTIPLIER = 0.5; // target to target*1.5 maps to 80-100%
 
-const FADE_OPACITY_WHEN_GAME_OVER = 0;
+const FADE_OPACITY_WHEN_GAME_OVER = 0.7;
 
 const MARKER_ANIM_DURATION = 350;
 const EASE_OUT = Easing.out(Easing.cubic);
@@ -234,7 +239,14 @@ export const PropProgressLine = memo(function PropProgressLine({
         {linePct > 0 && linePct < 100 && (
           <>
             <View
-              style={[styles.tickTarget, { left: `${linePct}%`, opacity: fadedOpacity }]}
+              style={[
+                styles.tickTarget,
+                {
+                  left: `${linePct}%`,
+                  opacity: fadedOpacity,
+                  backgroundColor: colorScheme === 'dark' ? '#e5e7eb' : '#374151',
+                },
+              ]}
             />
             <View
               style={[
@@ -347,6 +359,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
     paddingTop: 22,
+    // paddingBottom: 28,
     overflow: 'visible',
   },
   track: {
@@ -368,7 +381,6 @@ const styles = StyleSheet.create({
     bottom: -10,
     width: 3,
     marginLeft: -1.5,
-    backgroundColor: '#fff',
     borderRadius: 1,
   },
   tickSeasonAvg: {

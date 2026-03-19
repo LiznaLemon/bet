@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { getTeamColors } from '@/constants/team-colors';
 import { Colors } from '@/constants/theme';
 import type { ScheduleGame } from '@/lib/types';
+import { isTeamOnBackToBack } from '@/lib/utils/date';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -101,12 +102,48 @@ function formatDateLabel(game: ScheduleGame): string {
   return game.gameTime ? `${label} at ${game.gameTime}` : label;
 }
 
+/** Ensure we only display a clean record string (e.g. "21-42"), never raw JSON/objects. */
+function formatRecordForDisplay(record: string | null | undefined): string | null {
+  if (record == null) return null;
+  if (typeof record !== 'string') return null;
+  const trimmed = record.trim();
+  if (/^\d+-\d+$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+function TeamRecordRow({
+  record,
+  isB2B,
+  colors,
+}: {
+  record: string | null | undefined;
+  isB2B: boolean;
+  colors: { secondaryText: string; icon?: string };
+}) {
+  const displayRecord = formatRecordForDisplay(record);
+  const recordColor = colors.icon ?? colors.secondaryText;
+  return (
+    <View style={styles.recordColumn}>
+      {displayRecord ? (
+        <ThemedText style={[styles.recordText, { color: recordColor }]}>{displayRecord}</ThemedText>
+      ) : null}
+      {isB2B && (
+        <View style={styles.b2bBadge}>
+          <ThemedText style={styles.b2bBadgeText}>back to back</ThemedText>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function GameMatchupDisplay({
   game,
   colorScheme,
+  scheduleGames,
 }: {
   game: ScheduleGame;
   colorScheme: 'light' | 'dark';
+  scheduleGames?: ScheduleGame[];
 }) {
   const colors = Colors[colorScheme];
   const showScores =
@@ -118,6 +155,12 @@ export function GameMatchupDisplay({
   const isTie = showScores && (game.awayScore ?? 0) === (game.homeScore ?? 0);
   const awayColors = getTeamColors(game.awayTeamAbbrev);
   const homeColors = getTeamColors(game.homeTeamAbbrev);
+  const awayB2B =
+    game.awayBackToBack ?? (scheduleGames ? isTeamOnBackToBack(game.awayTeamAbbrev, game.gameDate, scheduleGames) : false);
+  const homeB2B =
+    game.homeBackToBack ?? (scheduleGames ? isTeamOnBackToBack(game.homeTeamAbbrev, game.gameDate, scheduleGames) : false);
+  const awayRecord = game.awayRecord ?? null;
+  const homeRecord = game.homeRecord ?? null;
 
   return (
     <>
@@ -145,12 +188,14 @@ export function GameMatchupDisplay({
                 </ThemedText>
               </View>
             )}
-            <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Away</ThemedText>
             <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
               {game.awayTeamAbbrev}
             </ThemedText>
+            <TeamRecordRow record={awayRecord} isB2B={awayB2B} colors={colors} />
           </View>
-          <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          <View style={styles.atWrapper}>
+            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          </View>
           <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
             {homeWon || isTie ? (
               <ThemedText
@@ -170,10 +215,10 @@ export function GameMatchupDisplay({
                 </ThemedText>
               </View>
             )}
-            <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Home</ThemedText>
             <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
               {game.homeTeamAbbrev}
             </ThemedText>
+            <TeamRecordRow record={homeRecord} isB2B={homeB2B} colors={colors} />
           </View>
         </View>
       ) : (
@@ -186,9 +231,11 @@ export function GameMatchupDisplay({
                 {game.awayTeamAbbrev}
               </TextWithTeamShadow>
             )}
-            <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Away</ThemedText>
+            <TeamRecordRow record={awayRecord} isB2B={awayB2B} colors={colors} />
           </View>
-          <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          <View style={styles.atWrapper}>
+            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          </View>
           <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
             {USE_PLAIN_WHITE_TEXT ? (
               <ThemedText style={[styles.previousScoreText, { color: '#ffffff' }]}>{game.homeTeamAbbrev}</ThemedText>
@@ -197,7 +244,7 @@ export function GameMatchupDisplay({
                 {game.homeTeamAbbrev}
               </TextWithTeamShadow>
             )}
-            <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Home</ThemedText>
+            <TeamRecordRow record={homeRecord} isB2B={homeB2B} colors={colors} />
           </View>
         </View>
       )}
@@ -207,7 +254,7 @@ export function GameMatchupDisplay({
 
 const styles = StyleSheet.create({
   headerTop: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   dateLabel: {
     fontSize: 14,
@@ -217,26 +264,49 @@ const styles = StyleSheet.create({
   previousScoreRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 0,
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 8,
   },
   previousScoreSide: {
     flex: 1,
     alignItems: 'flex-start',
+    // borderWidth: 1,
+    // borderColor: 'purple',
   },
   previousScoreColumn: {
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'flex-start',
+    // borderWidth: 1,
+    // borderColor: 'orange',
   },
-  previousScoreHomeAway: {
-    marginTop: 4,
+  recordColumn: {
+    marginTop: 2,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 3,
+    minHeight: 36,
+  },
+  recordText: {
     textAlign: 'center',
     fontSize: 14,
   },
+  b2bBadge: {
+    paddingHorizontal: 6,
+    // paddingVertical: 2,
+    borderRadius: 4,
+    // backgroundColor: '#9ca3af',
+    backgroundColor: '#373737',
+  },
+  b2bBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
   previousScoreTeamName: {
-    marginTop: 2,
+    marginTop: 0,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -260,11 +330,25 @@ const styles = StyleSheet.create({
   previousScoreOutlineFill: {
     position: 'relative',
   },
+  atWrapper: {
+    alignSelf: 'flex-start',
+    // borderWidth: 1,
+    // borderColor: 'cyan',
+  },
   scoreDash: {
-    fontSize: 24,
+    fontSize: 16,
+    fontWeight: '700',
+    // textTransform: 'uppercase',
+    paddingTop: 12,
+    // borderWidth: 1,
+    // borderColor: 'red',
   },
   previousScoreDash: {
-    fontSize: 32,
+    fontSize: 16,
+    fontWeight: '700',
+    // textTransform: 'uppercase',
+    // borderWidth: 1,
+    // borderColor: 'magenta',
   },
   shadowTextWrap: {
     position: 'relative',

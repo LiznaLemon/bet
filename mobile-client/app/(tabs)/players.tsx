@@ -4,10 +4,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { usePlayers } from '@/lib/queries/players';
-import { useSchedule } from '@/lib/queries/schedule';
+import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
 import type { Player } from '@/lib/types';
-import { getTeamGamesByAbbrev, qualifiesForCategory } from '@/lib/utils/player-qualification';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,18 +30,34 @@ type SortOption = 'ppg' | 'rpg' | 'apg' | '3pm' | 'spg' | 'bpg';
 
 const ITEM_HEIGHT = 116; // Long layout height (100) + marginBottom (16)
 const LIST_PADDING_TOP = 20;
+const SEASON = 2026;
 
 export default function PlayersScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { data: playersData = [], isLoading, isError, error, refetch, isRefetching } = usePlayers();
-  const { data: scheduleData = [] } = useSchedule();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('ppg');
+  const deferredSortBy = useDeferredValue(sortBy);
+
+  const {
+    data: paginatedData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePlayersPaginated(SEASON, searchQuery, deferredSortBy);
+
+  const playersData: PaginatedPlayer[] = useMemo(
+    () => paginatedData?.pages.flatMap((p) => p.players) ?? [],
+    [paginatedData]
+  );
 
   const handleRefresh = useCallback(() => {
     refetch();
   }, [refetch]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('ppg');
-  const deferredSortBy = useDeferredValue(sortBy);
   const [cardLayout, setCardLayout] = useState<'default' | 'compact' | 'detailed' | 'wide' | 'long'>('long');
   const triggerMapRef = useRef<Record<string, number>>({});
   const triggerCounterRef = useRef(0);
@@ -93,49 +107,36 @@ export default function PlayersScreen() {
     opacity: overlayOpacity.value,
   }));
 
-  const teamGamesByAbbrev = useMemo(
-    () => getTeamGamesByAbbrev(scheduleData),
-    [scheduleData]
-  );
-
-  const filtered = useMemo(() => {
-    const query = searchQuery.toLowerCase();
-    return playersData.filter((player: Player) =>
-      player.athlete_display_name.toLowerCase().includes(query) ||
-      player.team_abbreviation.toLowerCase().includes(query),
-    );
-  }, [playersData, searchQuery]);
-
-  const filteredPlayers = useMemo(() => {
-    const qualified = filtered.filter((p: Player) =>
-      qualifiesForCategory(p, deferredSortBy, teamGamesByAbbrev)
-    );
-    if (deferredSortBy === '3pm') {
-      const get3pm = (p: Player) =>
-        (p.total_three_point_made ?? 0) / Math.max(1, p.games_played ?? 1);
-      return qualified.sort((a, b) => get3pm(b) - get3pm(a));
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-    return qualified.sort((a, b) =>
-      parseFloat(b[deferredSortBy]) - parseFloat(a[deferredSortBy])
-    );
-  }, [filtered, deferredSortBy, teamGamesByAbbrev]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleChartAnimationComplete = useCallback((playerId: string) => {
     hasAnimatedRef.current[playerId] = true;
   }, []);
 
   const renderPlayer = useCallback(
-    ({ item }: { item: Player }) => (
-      <PlayerCard
-        player={item}
-        sortBy={deferredSortBy}
-        colorScheme={colorScheme}
-        layout={cardLayout}
-        animationTrigger={triggerMapRef.current[item.athlete_id] ?? 0}
-        skipChartAnimation={hasAnimatedRef.current[item.athlete_id] ?? false}
-        onChartAnimationComplete={() => handleChartAnimationComplete(item.athlete_id)}
-      />
-    ),
+    ({ item }: { item: PaginatedPlayer }) => {
+      const playerWithGameLog = {
+        ...item,
+        game_log: item.recent_game_log ?? item.game_log ?? [],
+      };
+      return (
+        <PlayerCard
+          player={playerWithGameLog}
+          sortBy={deferredSortBy}
+          colorScheme={colorScheme}
+          layout={cardLayout}
+          rank={item.stat_rank ?? undefined}
+          qualified={item.qualified !== false}
+          animationTrigger={triggerMapRef.current[item.athlete_id] ?? 0}
+          skipChartAnimation={hasAnimatedRef.current[item.athlete_id] ?? false}
+          onChartAnimationComplete={() => handleChartAnimationComplete(item.athlete_id)}
+        />
+      );
+    },
     [deferredSortBy, colorScheme, cardLayout, handleChartAnimationComplete],
   );
 
@@ -273,12 +274,12 @@ export default function PlayersScreen() {
           </ScrollView>
         ) : (
           <FlatList
-            data={filteredPlayers}
+            data={playersData}
             renderItem={renderPlayer}
             keyExtractor={item => item.athlete_id}
             contentContainerStyle={[
               styles.listContent,
-              filteredPlayers.length === 0 && styles.listContentEmpty,
+              playersData.length === 0 && styles.listContentEmpty,
             ]}
             showsVerticalScrollIndicator={false}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -289,15 +290,24 @@ export default function PlayersScreen() {
             maxToRenderPerBatch={10}
             windowSize={11}
             removeClippedSubviews={Platform.OS === 'android'}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
             refreshControl={
               <RefreshControl
-                refreshing={isRefetching}
+                refreshing={isRefetching && !isFetchingNextPage}
                 onRefresh={handleRefresh}
                 tintColor={Colors[colorScheme].tint}
               />
             }
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={Colors[colorScheme].tint} />
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
-              filteredPlayers.length === 0 ? (
+              playersData.length === 0 ? (
                 <View style={styles.centerMessage}>
                   <ThemedText style={styles.emptyText}>
                     {searchQuery ? 'No players match your search' : 'No players found'}

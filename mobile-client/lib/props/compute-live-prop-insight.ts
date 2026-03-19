@@ -3,14 +3,13 @@ import type {
   PlayerQuarterStatsRow,
 } from '@/lib/queries/player-quarter-stats';
 import {
-  ceilingInQuarter,
   conditionalPaceAtHalf,
+  maxStatWithQuartersLeft,
   pctQ4Gte,
   pctSecondHalfGte,
   pctTotalGte,
   pctExceededByGte,
   pctUnderByGte,
-  quarterPacingPattern,
   varianceInQuarter,
 } from '@/lib/queries/player-quarter-stats';
 import type { GameLogEntry } from '@/lib/types';
@@ -294,21 +293,6 @@ export function computeLivePropInsight(
     }
   }
 
-  // Quarter pacing pattern: weakest/strongest quarter
-  if (
-    prop.stat === 'points' &&
-    quarterContext &&
-    quarterContext.gamesWithSecondHalfData >= 15
-  ) {
-    const { weakest, strongest, weakestAvg, strongestAvg } = quarterPacingPattern(quarterContext);
-    const diff = strongestAvg - weakestAvg;
-    if (diff >= 1) {
-      insightStrings.push(
-        `Q${weakest} is typically his weakest (${weakestAvg.toFixed(1)} avg). Q${strongest} strongest (${strongestAvg.toFixed(1)}).`
-      );
-    }
-  }
-
   // Historical quarter/half exceed vs underperform rates
   if (
     prop.stat === 'points' &&
@@ -388,30 +372,6 @@ export function computeLivePropInsight(
     }
   }
 
-  // Ceiling: "He's scored 8+ in a quarter in X of Y games"
-  if (
-    prop.stat === 'points' &&
-    quarterRows &&
-    quarterRows.length >= 10 &&
-    currentPeriod != null &&
-    direction === 'over'
-  ) {
-    const needs = Math.ceil(line) - currentValue;
-    if (needs >= 4 && needs <= 18) {
-      const q = (Math.min(currentPeriod, 4) || 4) as 1 | 2 | 3 | 4;
-      const { count, total } = ceilingInQuarter(quarterRows, q, needs);
-      if (count > 0) {
-        insightStrings.push(
-          `He's scored ${needs}+ in a quarter in ${count}/${total} games.`
-        );
-      } else {
-        insightStrings.push(
-          `Never scored ${needs}+ in a quarter (${total} games).`
-        );
-      }
-    }
-  }
-
   // Variance: "His Q4 is highly variable" or "Within 1 of his Q4 avg in X% of games"
   if (
     prop.stat === 'points' &&
@@ -434,6 +394,39 @@ export function computeLivePropInsight(
     } else if (pctWithin1 >= 55) {
       insightStrings.push(
         `Within 1 of his Q${currentPeriod} avg in ${Math.round(pctWithin1)}% of games.`
+      );
+    }
+  }
+
+  // Max stat with quarters left: "The most they've scored with 2 quarters left is 24 PTS"
+  const SUPPORTED_QUARTER_STATS: PropStatKey[] = [
+    'points',
+    'rebounds',
+    'assists',
+    'steals',
+    'blocks',
+    'turnovers',
+    'fouls',
+  ];
+  if (
+    quarterRows &&
+    quarterRows.length >= 10 &&
+    currentPeriod != null &&
+    (currentPeriod === 3 || currentPeriod === 4) &&
+    SUPPORTED_QUARTER_STATS.includes(prop.stat)
+  ) {
+    const quartersLeft = 5 - currentPeriod;
+    const max = maxStatWithQuartersLeft(
+      quarterRows,
+      prop.stat as 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers' | 'fouls',
+      quartersLeft
+    );
+    if (max != null) {
+      const label = (PROP_STAT_LABELS[prop.stat] ?? prop.stat).toUpperCase();
+      const verb = prop.stat === 'points' ? 'scored' : 'gotten';
+      const quartersText = quartersLeft === 1 ? '1 quarter left' : '2 quarters left';
+      insightStrings.push(
+        `The most they've ${verb} with ${quartersText} is ${max} ${label}.`
       );
     }
   }

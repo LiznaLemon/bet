@@ -1,4 +1,5 @@
 import type { ScheduleGame } from '@/lib/types';
+import { getAbbrevAliases } from '@/lib/utils/team-abbreviation';
 
 export function formatShortDate(dateStr: string): string {
   if (!dateStr) return '';
@@ -20,12 +21,36 @@ export function getLocalDateStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Returns YYYY-MM-DD for a date offset from today (e.g. -7 = 7 days ago, 5 = 5 days from now). */
+export function getDateStrForOffset(daysFromToday: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromToday);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** Returns the previous calendar day as YYYY-MM-DD. */
 export function getPrevDayDateStr(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Returns true if the team played a game on the day before gameDate (i.e. they're on a back-to-back). */
+export function isTeamOnBackToBack(
+  teamAbbrev: string,
+  gameDate: string | null,
+  scheduleGames: ScheduleGame[]
+): boolean {
+  if (!gameDate || !scheduleGames.length) return false;
+  const prevDay = getPrevDayDateStr(gameDate);
+  const aliases = getAbbrevAliases(teamAbbrev).map((a) => a.toUpperCase().trim());
+  return scheduleGames.some((g) => {
+    if (g.gameDate !== prevDay) return false;
+    const homeAbbrev = (g.homeTeamAbbrev ?? '').toUpperCase().trim();
+    const awayAbbrev = (g.awayTeamAbbrev ?? '').toUpperCase().trim();
+    return aliases.includes(homeAbbrev) || aliases.includes(awayAbbrev);
+  });
 }
 
 /** Returns today's opponent if the team has a game today; null otherwise. */

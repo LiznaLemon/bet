@@ -1,4 +1,5 @@
 import type { PlayByPlayRecord } from '@/lib/queries/play-by-play';
+import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 
 export type LiveStatDeltas = {
   athlete_id: string;
@@ -101,6 +102,16 @@ function getDeltasForPlay(play: PlayByPlayRecord): Map<string, Omit<LiveStatDelt
     addDeltas(String(play.athlete_id_1), { turnovers: 1 });
   }
 
+  // Steals: athlete_id_1 is the stealer
+  if (typeText.includes('steal') && play.athlete_id_1 != null) {
+    addDeltas(String(play.athlete_id_1), { steals: 1 });
+  }
+
+  // Blocks: athlete_id_1 is the blocker (e.g. "Blocked Shot")
+  if (typeText.includes('block') && play.athlete_id_1 != null) {
+    addDeltas(String(play.athlete_id_1), { blocks: 1 });
+  }
+
   // Fouls
   if (typeText.includes('foul') && play.athlete_id_1 != null && !typeText.includes('turnover')) {
     addDeltas(String(play.athlete_id_1), { fouls: 1 });
@@ -201,6 +212,37 @@ export function findLastPlayIndexForQuarter(
 }
 
 /**
+ * Returns true if the quarter has ended at the current play index.
+ * Handles both Supabase (type_text "End Period") and ESPN ("End of the Xth Quarter") formats.
+ * Also treats clock at 0 as quarter end.
+ */
+export function isQuarterEndedAtPlayIndex(
+  plays: PlayByPlayRecord[],
+  playIndex: number,
+  quarter: number
+): boolean {
+  const lastIdx = findLastPlayIndexForQuarter(plays, quarter);
+  if (lastIdx < 0 || playIndex < lastIdx) return false;
+  const play = plays[lastIdx];
+  if (!play) return false;
+  const typeText = (play.type_text ?? '').toLowerCase();
+  const isEndPeriod =
+    typeText.includes('end period') ||
+    (typeText.includes('end of') && typeText.includes('quarter')) ||
+    typeText.includes('end of the');
+  const secs = play.start_quarter_seconds_remaining;
+  const clockAtZero = secs != null && secs <= 0;
+  const clockDisplay = (play.clock_display_value ?? '').trim();
+  const clockAtZeroDisplay =
+    clockDisplay === '0' ||
+    clockDisplay === '0.0' ||
+    clockDisplay === '0:00' ||
+    clockDisplay === '0:0.0' ||
+    /^0:0\.?0*$/.test(clockDisplay);
+  return isEndPeriod || clockAtZero || clockAtZeroDisplay;
+}
+
+/**
  * Get accumulated stats at the end of each completed quarter.
  * Returns maps for Q1, Q2, Q3, Q4 when we're past those quarters (based on current playIndex).
  */
@@ -225,6 +267,45 @@ export function getStatsAtQuarterEnds(
     q3: lastQ3 >= 0 && playIndex >= lastQ3 ? accumulateStatsFromPlays(plays, lastQ3, athleteIds) : null,
     q4: lastQ4 >= 0 && playIndex >= lastQ4 ? accumulateStatsFromPlays(plays, lastQ4, athleteIds) : null,
   };
+}
+
+export type PlayWithScore = PlayByPlayRecord & { away_score?: number; home_score?: number };
+
+/**
+ * Get away/home score at a given play index.
+ * Uses per-play away_score/home_score when available (ESPN), otherwise accumulates from scoring plays.
+ */
+export function getScoreAtPlayIndex(
+  plays: PlayWithScore[],
+  playIndex: number,
+  athleteToTeam: Map<string, string>,
+  awayTeamAbbrev: string,
+  homeTeamAbbrev: string
+): { awayScore: number; homeScore: number } {
+  const endIdx = Math.min(playIndex, plays.length - 1);
+  if (endIdx < 0) return { awayScore: 0, homeScore: 0 };
+
+  const lastPlay = plays[endIdx];
+  if (lastPlay.away_score != null && lastPlay.home_score != null) {
+    return { awayScore: lastPlay.away_score, homeScore: lastPlay.home_score };
+  }
+
+  const awayNorm = toThreeLetterAbbrev(awayTeamAbbrev) || awayTeamAbbrev.toUpperCase();
+  const homeNorm = toThreeLetterAbbrev(homeTeamAbbrev) || homeTeamAbbrev.toUpperCase();
+
+  let awayScore = 0;
+  let homeScore = 0;
+  for (let i = 0; i <= endIdx; i++) {
+    const play = plays[i];
+    if (play.scoring_play && play.athlete_id_1 != null) {
+      const pts = play.score_value ?? 0;
+      const teamRaw = athleteToTeam.get(String(play.athlete_id_1)) ?? athleteToTeam.get(String(Number(play.athlete_id_1)));
+      const teamNorm = toThreeLetterAbbrev(teamRaw) || (teamRaw ?? '').toUpperCase();
+      if (teamNorm === awayNorm) awayScore += pts;
+      else if (teamNorm === homeNorm) homeScore += pts;
+    }
+  }
+  return { awayScore, homeScore };
 }
 
 /**
@@ -254,4 +335,83 @@ export function getGameStateAtPlay(
     clockDisplay,
     gameSecondsRemaining: play.start_game_seconds_remaining ?? null,
   };
+}
+
+function isSubstitutionPlay(play: PlayByPlayRecord): boolean {
+  const typeText = (play.type_text ?? '').toLowerCase();
+  return typeText.includes('substitution') || typeText.includes('sub:');
+}
+
+/**
+ * Compute the set of athlete IDs currently on court at a given play index.
+ * Derives lineup from starters (first 5 per team from early plays) + substitution events.
+ * Returns null when data is insufficient (empty plays, empty athleteToTeam, or cannot infer starters).
+ */
+export function computeOnCourtAtPlayIndex(
+  plays: PlayByPlayRecord[],
+  playIndex: number,
+  athleteToTeam: Map<string, string>,
+  awayAbbrev: string,
+  homeAbbrev: string
+): Set<string> | null {
+  if (plays.length === 0 || athleteToTeam.size === 0) return null;
+
+  const awayNorm = toThreeLetterAbbrev(awayAbbrev) || awayAbbrev.toUpperCase();
+  const homeNorm = toThreeLetterAbbrev(homeAbbrev) || homeAbbrev.toUpperCase();
+
+  const getTeam = (athleteId: string): 'away' | 'home' | null => {
+    const team = athleteToTeam.get(athleteId) ?? athleteToTeam.get(String(Number(athleteId)));
+    if (!team) return null;
+    const teamNorm = toThreeLetterAbbrev(team) || team.toUpperCase();
+    if (teamNorm === awayNorm) return 'away';
+    if (teamNorm === homeNorm) return 'home';
+    return null;
+  };
+
+  const awayOnCourt = new Set<string>();
+  const homeOnCourt = new Set<string>();
+
+  const firstSubIdx = plays.findIndex((p) => isSubstitutionPlay(p));
+  const bootstrapLimit = firstSubIdx >= 0 ? firstSubIdx : Math.min(20, plays.length);
+
+  for (let i = 0; i < bootstrapLimit; i++) {
+    const play = plays[i];
+    if (isSubstitutionPlay(play)) continue;
+
+    const ids: (number | null)[] = [play.athlete_id_1, play.athlete_id_2, play.athlete_id_3];
+    for (const id of ids) {
+      if (id == null) continue;
+      const sid = String(id);
+      const team = getTeam(sid);
+      if (team === 'away' && awayOnCourt.size < 5) awayOnCourt.add(sid);
+      else if (team === 'home' && homeOnCourt.size < 5) homeOnCourt.add(sid);
+    }
+  }
+
+  if (awayOnCourt.size === 0 && homeOnCourt.size === 0) return null;
+
+  const endIdx = Math.min(playIndex, plays.length - 1);
+  for (let i = 0; i <= endIdx; i++) {
+    const play = plays[i];
+    if (!isSubstitutionPlay(play)) continue;
+
+    const playerIn = play.athlete_id_1 != null ? String(play.athlete_id_1) : null;
+    const playerOut = play.athlete_id_2 != null ? String(play.athlete_id_2) : null;
+    if (!playerIn || !playerOut) continue;
+
+    const teamOut = getTeam(playerOut);
+
+    if (teamOut === 'away') {
+      awayOnCourt.delete(playerOut);
+      awayOnCourt.add(playerIn);
+    } else if (teamOut === 'home') {
+      homeOnCourt.delete(playerOut);
+      homeOnCourt.add(playerIn);
+    }
+  }
+
+  const result = new Set<string>();
+  for (const id of awayOnCourt) result.add(id);
+  for (const id of homeOnCourt) result.add(id);
+  return result.size > 0 ? result : null;
 }

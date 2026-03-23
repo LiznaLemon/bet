@@ -28,7 +28,7 @@ export async function getLastGameDate(supabase) {
  * @returns {import('@supabase/supabase-js').SupabaseClient|null}
  */
 export function getSupabaseClient() {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_API_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);

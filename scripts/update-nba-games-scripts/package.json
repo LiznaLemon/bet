@@ -1,18 +1,19 @@
 {
   "name": "nba-data-updater",
   "version": "1.0.0",
-  "description": "Update NBA play-by-play, player boxscores, and team boxscores in Supabase from ESPN API",
-  "type": "module",
+  "description": "Update NBA game data to Supabase",
   "main": "update-nba-data.js",
   "scripts": {
-    "update": "node update-nba-data.js",
-    "update:csv": "node update-nba-data.js --csv"
+    "start": "node update-nba-data.js",
+    "test": "node test-update.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "csv-stringify": "^6.5.2",
-    "dotenv": "^16.4.5"
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.3.1"
   },
+  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   }

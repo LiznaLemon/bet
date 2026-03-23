@@ -3,6 +3,9 @@ name: Deploy API
 on:
     push:
         branches: [main]
+        paths:
+            - "bet_backend/**"
+            - "scripts/update-nba-games-scripts/**"
 
 jobs:
     deploy:
@@ -22,11 +25,205 @@ jobs:
 
             - name: Deploy to droplet
               run: |
-                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} '
-                    cd /root/bet &&
-                    git pull origin main &&
-                    cd bet_backend &&
-                    go mod download &&
-                    go build -o api . &&
-                    sudo systemctl restart api
-                  '
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} << 'EOF'
+                  set -e  # Exit on any error
+
+                  # Clean up any stale git locks
+                  echo "Cleaning up any stale git locks..."
+                  rm -f /root/bet/.git/index.lock 2>/dev/null || true
+                  rm -f /root/bet/.git/HEAD.lock 2>/dev/null || true
+                  rm -f /root/bet/.git/refs/heads/*.lock 2>/dev/null || true
+
+                  # Wait for any existing apt processes to finish
+                  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+                      echo "Waiting for apt lock to be released..."
+                      sleep 2
+                  done
+
+                  # Check if Go is already installed
+                  if ! command -v go &> /dev/null; then
+                      echo "Installing Go..."
+                      # Kill any stuck apt processes if they exist
+                      kill -9 1047 2>/dev/null || true
+                      rm -f /var/lib/apt/lists/lock
+                      rm -f /var/cache/apt/archives/lock
+                      rm -f /var/lib/dpkg/lock-frontend
+                      rm -f /var/lib/dpkg/lock
+                      dpkg --configure -a
+                      apt-get update
+                      apt-get install -y wget
+                      
+                      wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz -O /tmp/go.tar.gz
+                      rm -rf /usr/local/go
+                      tar -C /usr/local -xzf /tmp/go.tar.gz
+                      rm /tmp/go.tar.gz
+                  fi
+
+                  export PATH=$PATH:/usr/local/go/bin
+                  echo "Go version: $(go version)"
+
+                  # Clone or update repository with lock cleanup
+                  if [ ! -d /root/bet ]; then
+                      git clone https://github.com/LiznaLemon/bet.git /root/bet
+                  else
+                      cd /root/bet
+                      # Clean up any stale locks before git operations
+                      rm -f .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock 2>/dev/null || true
+                      git fetch origin
+                      git reset --hard origin/main
+                  fi
+
+                  # ============================================
+                  # BUILD GO API
+                  # ============================================
+                  cd /root/bet/bet_backend
+                  echo "Building API..."
+                  go mod download
+                  go build -o bet .
+
+                  # Make sure binary is executable
+                  chmod +x bet
+
+                  # Verify the build was successful
+                  if [ ! -f bet ]; then
+                      echo "Error: Binary not created!"
+                      exit 1
+                  fi
+
+                  # Update systemd service file
+                  cat > /etc/systemd/system/api.service << 'SERVICE_EOF'
+                  [Unit]
+                  Description=Bet API
+                  After=network.target
+
+                  [Service]
+                  Type=simple
+                  User=root
+                  WorkingDirectory=/root/bet/bet_backend
+                  ExecStart=/root/bet/bet_backend/bet
+                  Restart=on-failure
+                  RestartSec=5
+                  Environment="GIN_MODE=release"
+                  Environment="PORT=8080"
+
+                  [Install]
+                  WantedBy=multi-user.target
+                  SERVICE_EOF
+
+                  # ============================================
+                  # SETUP NODE.JS SCRIPT
+                  # ============================================
+                  echo "Setting up Node.js script..."
+
+                  # Install Node.js if not present
+                  if ! command -v node &> /dev/null; then
+                      echo "Installing Node.js 20.x..."
+                      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+                      apt-get install -y nodejs
+                  fi
+
+                  # Install npm dependencies for the script
+                  cd /root/bet/scripts/update-nba-games-scripts
+                  if [ -f package.json ]; then
+                      echo "Installing npm dependencies..."
+                      npm install
+                  fi
+
+                  # Create the run script with environment variables
+                  cat > run-update.sh << 'SCRIPT_EOF'
+                  #!/bin/bash
+                  set -e
+
+                  cd /root/bet/scripts/update-nba-games-scripts
+
+                  echo "$(date): Starting NBA data update..."
+                  /usr/bin/node update-nba-data.js
+                  echo "$(date): NBA data update completed"
+                  SCRIPT_EOF
+
+                  chmod +x run-update.sh
+
+                  # Create log file
+                  touch /var/log/nba-update.log
+                  chmod 644 /var/log/nba-update.log
+
+                  # Set up log rotation
+                  cat > /etc/logrotate.d/nba-update << 'LOG_EOF'
+                  /var/log/nba-update.log {
+                      daily
+                      rotate 7
+                      compress
+                      missingok
+                      notifempty
+                      create 644 root root
+                  }
+                  LOG_EOF
+
+                  # Add cron job for daily updates at 3 AM
+                  cat > /etc/cron.d/nba-update << 'CRON_EOF'
+                  # NBA data update - runs daily at 3:00 AM
+                  0 3 * * * root /root/bet/scripts/update-nba-games-scripts/run-update.sh >> /var/log/nba-update.log 2>&1
+                  CRON_EOF
+                  chmod 644 /etc/cron.d/nba-update
+
+                  # ============================================
+                  # RESTART SERVICES
+                  # ============================================
+                  echo "Restarting services..."
+                  systemctl daemon-reload
+                  systemctl enable api
+                  systemctl restart api
+
+                  # Check service status
+                  sleep 2
+                  systemctl status api --no-pager || true
+
+                  # Check if API is actually running
+                  if pgrep -f "/root/bet/bet_backend/bet" > /dev/null; then
+                      echo "✓ API is running"
+                  else
+                      echo "⚠ API may not be running. Checking logs..."
+                      # Try to run binary manually to see error
+                      cd /root/bet/bet_backend
+                      timeout 2 ./bet || true
+                  fi
+
+                  # ============================================
+                  # VERIFICATION
+                  # ============================================
+                  echo ""
+                  echo "=== Deployment Verification ==="
+
+                  # Verify Go binary
+                  if [ -f /root/bet/bet_backend/bet ]; then
+                      echo "✓ Go API binary is present"
+                  else
+                      echo "✗ Go API binary is missing"
+                  fi
+
+                  # Verify Node.js setup
+                  if [ -f /root/bet/scripts/update-nba-games-scripts/update-nba-data.js ]; then
+                      echo "✓ Node.js script is present"
+                  fi
+
+                  if [ -x /root/bet/scripts/update-nba-games-scripts/run-update.sh ]; then
+                      echo "✓ Run script is executable"
+                  fi
+
+                  if [ -f /etc/cron.d/nba-update ]; then
+                      echo "✓ Cron job is configured"
+                  fi
+
+                  echo ""
+                  echo "=== Deployment Complete! ==="
+                  echo "API is running and NBA data will update daily at 3:00 AM"
+                  echo "Logs: /var/log/nba-update.log"
+                  echo ""
+                  echo "To test the Node.js script manually, run:"
+                  echo "  /root/bet/scripts/update-nba-games-scripts/run-update.sh"
+                  echo ""
+                  echo "To check API logs:"
+                  echo "  systemctl status api --no-pager -l"
+                  echo "  journalctl -u api -f"
+
+                  EOF

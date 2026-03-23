@@ -70,7 +70,7 @@ No authentication required. The summary returns `header`, `plays`, `boxscore` (t
    Copy `.env.example` to `.env` or `.env.local` and set:
 
    ```
-   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_API_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    ```
 

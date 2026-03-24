@@ -24,6 +24,31 @@ export async function getLastGameDate(supabase) {
 }
 
 /**
+ * Latest calendar game_date present across play-by-play and boxscore raw tables.
+ * Used to choose the start of an incremental sync.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<string|null>} YYYY-MM-DD or null if all are empty
+ */
+export async function getLastUpdatedGameDate(supabase) {
+  const tables = ['play_by_play_raw', 'player_boxscores_raw', 'team_boxscores_raw'];
+  const candidates = [];
+  for (const table of tables) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('game_date')
+      .order('game_date', { ascending: false })
+      .limit(1);
+    if (error || !data?.length) continue;
+    const raw = data[0].game_date;
+    if (raw == null) continue;
+    candidates.push(String(raw).slice(0, 10));
+  }
+  if (candidates.length === 0) return null;
+  return candidates.sort().at(-1);
+}
+
+/**
  * Create Supabase client from env
  * @returns {import('@supabase/supabase-js').SupabaseClient|null}
  */

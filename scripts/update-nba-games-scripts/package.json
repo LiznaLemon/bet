@@ -2,15 +2,15 @@
   "name": "nba-data-updater",
   "version": "1.0.0",
   "description": "Update NBA game data to Supabase",
+  "type": "module",
   "main": "update-nba-data.js",
   "scripts": {
     "start": "node update-nba-data.js",
-    "test": "node test-update.js"
+    "update": "node update-nba-data.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "axios": "^1.6.0",
-    "csv-writer": "^1.6.0",
+    "csv-stringify": "^6.5.2",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {},

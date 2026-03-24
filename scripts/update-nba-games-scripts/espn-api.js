@@ -12,7 +12,7 @@ const SUMMARY_URL = 'http://site.api.espn.com/apis/site/v2/sports/basketball/nba
  * @returns {Promise<Array>} Array of completed game objects { game_id, date, ... }
  */
 export async function fetchScoreboard(date) {
-  const dateStr = typeof date === 'string' ? date : formatDateYYYYMMDD(date);
+  const dateStr = typeof date === 'string' ? normalizeScoreboardDate(date) : formatDateYYYYMMDD(date);
   const url = `${SCOREBOARD_URL}?limit=1000&dates=${dateStr}`;
 
   const res = await fetch(url);
@@ -28,11 +28,44 @@ export async function fetchScoreboard(date) {
       const status = e.status?.type;
       return status?.name === 'STATUS_FINAL' || status?.completed === true;
     })
-    .map((e) => ({
-      game_id: parseInt(e.id, 10),
-      date: dateStr,
-      ...e,
-    }));
+    .map((e) => mapScoreboardEvent(e, dateStr));
+}
+
+/**
+ * All games on the scoreboard for a date (final, in progress, scheduled).
+ * Use this when you also need schedule/status updates before the game is final.
+ *
+ * @param {string|Date} date - YYYYMMDD or Date
+ * @returns {Promise<Array>} Scoreboard events with game_id and date
+ */
+export async function fetchScoreboardAllEvents(date) {
+  const dateStr = typeof date === 'string' ? normalizeScoreboardDate(date) : formatDateYYYYMMDD(date);
+  const url = `${SCOREBOARD_URL}?limit=1000&dates=${dateStr}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`ESPN scoreboard failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  const events = data.events || [];
+
+  return events.map((e) => mapScoreboardEvent(e, dateStr));
+}
+
+function mapScoreboardEvent(e, dateStr) {
+  return {
+    ...e,
+    game_id: parseInt(e.id, 10),
+    date: dateStr,
+  };
+}
+
+/** Accept YYYYMMDD or YYYY-MM-DD */
+function normalizeScoreboardDate(s) {
+  if (/^\d{8}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.replace(/-/g, '');
+  return s;
 }
 
 /**

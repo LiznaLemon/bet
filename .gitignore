@@ -50,4 +50,4 @@ temp/
 .cache/
 
 # Project-specific
-markdown_plans/
+cloud-config.yml

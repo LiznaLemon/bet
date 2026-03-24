@@ -17,9 +17,9 @@ const (
 )
 
 func main() {
-	dbSource := os.Getenv("SUPABASE_DB_CON_STRING")
+	dbSource := os.Getenv("DB_CON_STRING")
 	if dbSource == "" {
-		log.Fatal("SUPABASE_DB_CON_STRING environment variable is not set")
+		log.Fatal("DB_CON_STRING environment variable is not set")
 	}
 
 	conn, err := sql.Open(dbDriver, dbSource)

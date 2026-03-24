@@ -23,10 +23,10 @@ jobs:
                   chmod 600 ~/.ssh/bet
                   ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-            - name: Deploy to droplet
+            - name: Deploy main application
               run: |
-                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} << 'EOF'
-                  set -e  # Exit on any error
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} 'bash -s' << 'EOF'
+                  set -e
 
                   # Clean up any stale git locks
                   echo "Cleaning up any stale git locks..."
@@ -43,7 +43,6 @@ jobs:
                   # Check if Go is already installed
                   if ! command -v go &> /dev/null; then
                       echo "Installing Go..."
-                      # Kill any stuck apt processes if they exist
                       kill -9 1047 2>/dev/null || true
                       rm -f /var/lib/apt/lists/lock
                       rm -f /var/cache/apt/archives/lock
@@ -67,31 +66,31 @@ jobs:
                       git clone https://github.com/LiznaLemon/bet.git /root/bet
                   else
                       cd /root/bet
-                      # Clean up any stale locks before git operations
                       rm -f .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock 2>/dev/null || true
                       git fetch origin
                       git reset --hard origin/main
                   fi
 
-                  # ============================================
-                  # BUILD GO API
-                  # ============================================
+                  # Build Go API
                   cd /root/bet/bet_backend
                   echo "Building API..."
                   go mod download
                   go build -o bet .
-
-                  # Make sure binary is executable
                   chmod +x bet
 
-                  # Verify the build was successful
                   if [ ! -f bet ]; then
                       echo "Error: Binary not created!"
                       exit 1
                   fi
 
+                  # Create environment file for Go API
+                  cat > /etc/default/bet-api << ENV_EOF
+                  DB_CON_STRING="${{ secrets.DB_CON_STRING }}"
+                  ENV_EOF
+                  chmod 600 /etc/default/bet-api
+
                   # Update systemd service file
-                  cat > /etc/systemd/system/api.service << 'SERVICE_EOF'
+                  cat > /etc/systemd/system/api.service << SERVICE_EOF
                   [Unit]
                   Description=Bet API
                   After=network.target
@@ -105,15 +104,34 @@ jobs:
                   RestartSec=5
                   Environment="GIN_MODE=release"
                   Environment="PORT=8080"
+                  EnvironmentFile=/etc/default/bet-api
 
                   [Install]
                   WantedBy=multi-user.target
                   SERVICE_EOF
 
-                  # ============================================
-                  # SETUP NODE.JS SCRIPT
-                  # ============================================
-                  echo "Setting up Node.js script..."
+                  # Restart services
+                  echo "Restarting services..."
+                  systemctl daemon-reload
+                  systemctl enable api
+                  systemctl restart api
+
+                  sleep 2
+                  systemctl status api --no-pager || true
+
+                  if pgrep -f "/root/bet/bet_backend/bet" > /dev/null; then
+                      echo "✓ API is running"
+                  else
+                      echo "⚠ API may not be running"
+                  fi
+
+                  echo "=== Main application deployment complete ==="
+                  EOF
+
+            - name: Setup Node.js environment
+              run: |
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} 'bash -s' << 'EOF'
+                  set -e
 
                   # Install Node.js if not present
                   if ! command -v node &> /dev/null; then
@@ -122,24 +140,59 @@ jobs:
                       apt-get install -y nodejs
                   fi
 
-                  # Install npm dependencies for the script
+                  echo "Node.js version: $(node --version)"
+                  echo "npm version: $(npm --version)"
+                  EOF
+
+            - name: Create Node.js environment file
+              run: |
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} "
+                  cat > /root/.env.nba-updater << 'ENVEOF'
+                  SUPABASE_API_URL=${{ secrets.SUPABASE_API_URL }}
+                  SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+                  ENVEOF
+                  chmod 600 /root/.env.nba-updater
+                  "
+
+            - name: Setup NBA update script
+              run: |
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} 'bash -s' << 'EOF'
+                  set -e
+
+                  # Install npm dependencies
                   cd /root/bet/scripts/update-nba-games-scripts
                   if [ -f package.json ]; then
                       echo "Installing npm dependencies..."
                       npm install
                   fi
 
-                  # Create the run script with environment variables
-                  cat > run-update.sh << 'SCRIPT_EOF'
+                  # Create the run script 
+                  cat > run-update.sh << 'SCRIPTEOF'
                   #!/bin/bash
                   set -e
 
                   cd /root/bet/scripts/update-nba-games-scripts
 
+                  # Load environment variables
+                  if [ -f /root/.env.nba-updater ]; then
+                      set -a
+                      source /root/.env.nba-updater
+                      set +a
+                  fi
+
+                  # Verify variables are set
+                  if [ -z "$SUPABASE_API_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+                      echo "ERROR: Missing required environment variables"
+                      echo "SUPABASE_API_URL is set: ${SUPABASE_API_URL:+yes}"
+                      echo "SUPABASE_SERVICE_ROLE_KEY is set: ${SUPABASE_SERVICE_ROLE_KEY:+yes}"
+                      exit 1
+                  fi
+
                   echo "$(date): Starting NBA data update..."
+                  echo "Using API URL: $SUPABASE_API_URL"
                   /usr/bin/node update-nba-data.js
                   echo "$(date): NBA data update completed"
-                  SCRIPT_EOF
+                  SCRIPTEOF
 
                   chmod +x run-update.sh
 
@@ -148,7 +201,7 @@ jobs:
                   chmod 644 /var/log/nba-update.log
 
                   # Set up log rotation
-                  cat > /etc/logrotate.d/nba-update << 'LOG_EOF'
+                  cat > /etc/logrotate.d/nba-update << 'LOGEOF'
                   /var/log/nba-update.log {
                       daily
                       rotate 7
@@ -157,51 +210,30 @@ jobs:
                       notifempty
                       create 644 root root
                   }
-                  LOG_EOF
+                  LOGEOF
 
                   # Add cron job for daily updates at 3 AM
-                  cat > /etc/cron.d/nba-update << 'CRON_EOF'
+                  cat > /etc/cron.d/nba-update << 'CRONEOF'
                   # NBA data update - runs daily at 3:00 AM
                   0 3 * * * root /root/bet/scripts/update-nba-games-scripts/run-update.sh >> /var/log/nba-update.log 2>&1
-                  CRON_EOF
+                  CRONEOF
                   chmod 644 /etc/cron.d/nba-update
 
-                  # ============================================
-                  # RESTART SERVICES
-                  # ============================================
-                  echo "Restarting services..."
-                  systemctl daemon-reload
-                  systemctl enable api
-                  systemctl restart api
+                  echo "✓ NBA update script setup complete"
+                  EOF
 
-                  # Check service status
-                  sleep 2
-                  systemctl status api --no-pager || true
-
-                  # Check if API is actually running
-                  if pgrep -f "/root/bet/bet_backend/bet" > /dev/null; then
-                      echo "✓ API is running"
-                  else
-                      echo "⚠ API may not be running. Checking logs..."
-                      # Try to run binary manually to see error
-                      cd /root/bet/bet_backend
-                      timeout 2 ./bet || true
-                  fi
-
-                  # ============================================
-                  # VERIFICATION
-                  # ============================================
+            - name: Verify deployment
+              run: |
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} << 'EOF'
                   echo ""
                   echo "=== Deployment Verification ==="
 
-                  # Verify Go binary
                   if [ -f /root/bet/bet_backend/bet ]; then
                       echo "✓ Go API binary is present"
                   else
                       echo "✗ Go API binary is missing"
                   fi
 
-                  # Verify Node.js setup
                   if [ -f /root/bet/scripts/update-nba-games-scripts/update-nba-data.js ]; then
                       echo "✓ Node.js script is present"
                   fi
@@ -214,6 +246,10 @@ jobs:
                       echo "✓ Cron job is configured"
                   fi
 
+                  if [ -f /root/.env.nba-updater ]; then
+                      echo "✓ Environment file exists"
+                  fi
+
                   echo ""
                   echo "=== Deployment Complete! ==="
                   echo "API is running and NBA data will update daily at 3:00 AM"
@@ -221,9 +257,4 @@ jobs:
                   echo ""
                   echo "To test the Node.js script manually, run:"
                   echo "  /root/bet/scripts/update-nba-games-scripts/run-update.sh"
-                  echo ""
-                  echo "To check API logs:"
-                  echo "  systemctl status api --no-pager -l"
-                  echo "  journalctl -u api -f"
-
                   EOF

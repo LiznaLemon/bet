@@ -6,9 +6,13 @@ on:
         paths:
             - "bet_backend/**"
             - "scripts/update-nba-games-scripts/**"
+    # 10:00 UTC — after typical West Coast games + buffer; GitHub cron is always UTC
+    schedule:
+        - cron: "0 10 * * *"
 
 jobs:
     deploy:
+        if: github.event_name == 'push'
         name: Deploy to DigitalOcean
         runs-on: ubuntu-latest
 
@@ -212,12 +216,8 @@ jobs:
                   }
                   LOGEOF
 
-                  # Add cron job for daily updates at 3 AM
-                  cat > /etc/cron.d/nba-update << 'CRONEOF'
-                  # NBA data update - runs daily at 3:00 AM
-                  0 3 * * * root /root/bet/scripts/update-nba-games-scripts/run-update.sh >> /var/log/nba-update.log 2>&1
-                  CRONEOF
-                  chmod 644 /etc/cron.d/nba-update
+                  # Remove legacy cron if present (NBA updates run on schedule via GitHub Actions, 10:00 UTC)
+                  rm -f /etc/cron.d/nba-update
 
                   echo "✓ NBA update script setup complete"
                   EOF
@@ -242,19 +242,32 @@ jobs:
                       echo "✓ Run script is executable"
                   fi
 
-                  if [ -f /etc/cron.d/nba-update ]; then
-                      echo "✓ Cron job is configured"
-                  fi
-
                   if [ -f /root/.env.nba-updater ]; then
                       echo "✓ Environment file exists"
                   fi
 
                   echo ""
                   echo "=== Deployment Complete! ==="
-                  echo "API is running and NBA data will update daily at 3:00 AM"
+                  echo "API is running; NBA data sync is scheduled in GitHub Actions at 10:00 UTC daily"
                   echo "Logs: /var/log/nba-update.log"
                   echo ""
                   echo "To test the Node.js script manually, run:"
                   echo "  /root/bet/scripts/update-nba-games-scripts/run-update.sh"
                   EOF
+
+    nba-data-update:
+        if: github.event_name == 'schedule'
+        name: Scheduled NBA data update (10:00 UTC)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Set up SSH
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/bet
+                  chmod 600 ~/.ssh/bet
+                  ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+            - name: Run NBA update on droplet
+              run: |
+                  ssh -o StrictHostKeyChecking=no -i ~/.ssh/bet root@${{ secrets.DROPLET_IP }} \
+                    '/root/bet/scripts/update-nba-games-scripts/run-update.sh'

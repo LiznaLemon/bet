@@ -5,6 +5,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   computeHitRatesByWindow,
+  getPlayerSeasonAvgFromTotals,
   getSeasonAvgFromGameLog,
 } from '@/lib/props/compute-prop-stats';
 import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
@@ -39,6 +40,21 @@ const PROP_STAT_OPTIONS: { key: PropStatKey; label: string }[] = [
   { key: 'three_pt_made', label: '3PT' },
   { key: 'free_throws_made', label: 'FT' },
 ];
+
+/** Per-game labels next to averages in player rows (aligned with Players tab / player-card). */
+const PROP_STAT_PLAYER_ROW_LABEL: Record<PropStatKey, string> = {
+  points: 'PPG',
+  rebounds: 'RPG',
+  assists: 'APG',
+  steals: 'SPG',
+  blocks: 'BPG',
+  minutes: 'MPG',
+  turnovers: 'TPG',
+  fouls: 'FPG',
+  two_pt_made: '2PM',
+  three_pt_made: '3PM',
+  free_throws_made: 'FTM',
+};
 
 const DOUBLE_DOUBLE_COMBOS: PropStatKey[][] = [
   ['points', 'rebounds'],
@@ -282,10 +298,7 @@ export function AddPropForm({
   const [playerSearch, setPlayerSearch] = useState('');
   const [selectedPropDrafts, setSelectedPropDrafts] = useState<SelectedPropDraft[]>([]);
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const lineStatLabel = useMemo(
-    () => PROP_STAT_OPTIONS.find((o) => o.key === stat)?.label ?? stat,
-    [stat]
-  );
+  const lineStatLabel = useMemo(() => PROP_STAT_PLAYER_ROW_LABEL[stat], [stat]);
 
   // --- Pagination ---
   const paginationEnabled = paginationSeason != null;
@@ -340,6 +353,12 @@ export function AddPropForm({
   }, []);
 
   const getPlayerAvg = useCallback((player: Player, selectedStat: PropStatKey): number => {
+    const gp = Number(player.games_played ?? 0);
+    // Full-season totals match get_players_paginated / Players tab. game_log from get_players_enhanced is capped
+    // (~30 games); averaging it skews "season" PTS vs the list screen.
+    if (gp > 0) {
+      return getPlayerSeasonAvgFromTotals(player, selectedStat);
+    }
     const log = getPlayerGameLog(player);
     if (log.length > 0) return getSeasonAvgFromGameLog(log, selectedStat);
     const fallbackByStat: Partial<Record<PropStatKey, number>> = {

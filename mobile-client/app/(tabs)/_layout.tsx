@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { RiveScheduleTabIcon } from '@/components/rive-schedule-tab-icon';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -28,7 +29,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Schedule',
-          tabBarIcon: ({ color }) => <Feather name="calendar" size={24} color={color} />,
+          tabBarIcon: () => <RiveScheduleTabIcon />,
         }}
       />
       <Tabs.Screen
@@ -39,7 +40,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="props"
         options={{
           title: 'Props',
           tabBarIcon: ({ color }) => <Feather name="clipboard" size={24} color={color} />,

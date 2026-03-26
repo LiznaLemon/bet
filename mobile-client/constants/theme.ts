@@ -23,10 +23,8 @@ export const Colors = {
     barBackground: '#687076',
   },
   dark: {
-    // text: '#ECEDEE',
     text: '#ffffff',
-    secondaryText: '#939393',
-    // background: '#151718',
+    secondaryText: '#595959',
     background: '#000000',
     tint: tintColorDark,
     icon: '#9BA1A6',
@@ -35,7 +33,6 @@ export const Colors = {
     cardBackground: '#1f2023',
     border: '#373737',
     chartBackground: '#373737',
-    // barBackground: '#9BA1A6', 
     barBackground: '#ffffff', 
   },
 };

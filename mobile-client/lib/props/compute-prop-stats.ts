@@ -112,7 +112,11 @@ export function getSeasonMaxFromGameLog(gameLog: GameLogEntry[], stat: PropStatK
   return Math.max(...gameLog.map((g) => getStatFromGameLog(g, stat)));
 }
 
-function getPlayerSeasonAvg(
+/**
+ * Per-game season average from RPC aggregate columns (full season, same basis as Players tab).
+ * Prefer this over mean(game_log): `get_players_enhanced` only returns a capped game_log (e.g. 30 games).
+ */
+export function getPlayerSeasonAvgFromTotals(
   player: { games_played?: number; [key: string]: unknown },
   stat: PropStatKey
 ): number {

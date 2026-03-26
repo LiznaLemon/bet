@@ -9,7 +9,7 @@ import type { PlayerProp } from '@/lib/types/props';
 import { useCallback, useMemo, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-export default function ExploreScreen() {
+export default function PropsScreen() {
   const { data: players = [], isLoading: playersLoading, refetch: refetchPlayers } = usePlayers();
   const { data: scheduleGames = [] } = useSchedule();
   const [props, setProps] = useState<PlayerProp[]>([]);

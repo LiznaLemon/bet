@@ -49,6 +49,35 @@ export async function getLastUpdatedGameDate(supabase) {
 }
 
 /**
+ * Read latest game_date_time watermark per table.
+ * Returns ISO timestamp strings (or null when table has no rows).
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<Record<string, string|null>>}
+ */
+export async function getTableUpdateWatermarks(supabase) {
+  const tables = ['play_by_play_raw', 'player_boxscores_raw', 'team_boxscores_raw', 'schedules'];
+  const watermarks = {};
+
+  for (const table of tables) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('game_date_time')
+      .order('game_date_time', { ascending: false })
+      .limit(1);
+
+    if (error || !data?.length || data[0].game_date_time == null) {
+      watermarks[table] = null;
+      continue;
+    }
+
+    watermarks[table] = String(data[0].game_date_time);
+  }
+
+  return watermarks;
+}
+
+/**
  * Create Supabase client from env
  * @returns {import('@supabase/supabase-js').SupabaseClient|null}
  */

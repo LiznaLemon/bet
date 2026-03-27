@@ -6,7 +6,7 @@ import { join } from 'path';
 import { fetchScoreboard, fetchGameSummary } from './espn-api.js';
 import { parsePlayByPlay, parsePlayerBox, parseTeamBox } from './parsers.js';
 import { writeToCsv } from './csv-writer.js';
-import { getLastUpdatedGameDate, getSupabaseClient, upsertGameData } from './supabase-client.js';
+import { getSupabaseClient, getTableUpdateWatermarks, upsertGameData } from './supabase-client.js';
 
 function todayISO() {
   const t = new Date();
@@ -21,6 +21,26 @@ function addDaysISO(iso, days) {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + days);
   return dt.toISOString().slice(0, 10);
+}
+
+function isoDateFromTimestamp(ts) {
+  return String(ts).slice(0, 10);
+}
+
+function printTableWatermarks(watermarks) {
+  const entries = Object.entries(watermarks);
+  if (entries.length === 0) return;
+
+  const present = entries.filter(([, ts]) => !!ts);
+  const oldest = present.length
+    ? present.slice().sort((a, b) => String(a[1]).localeCompare(String(b[1])))[0]
+    : null;
+
+  console.log('📌 Table watermarks (latest game_date_time):');
+  for (const [table, ts] of entries) {
+    const mark = oldest && oldest[0] === table ? ' <- lagging' : '';
+    console.log(`   - ${table}: ${ts ?? '(no rows)'}${mark}`);
+  }
 }
 
 function parseArgs(argv) {
@@ -107,11 +127,22 @@ async function main() {
 
   const toDate = args.to ?? todayISO();
   let fromDate = args.from;
+  let watermarks = null;
+
+  if (supabase) {
+    watermarks = await getTableUpdateWatermarks(supabase);
+    printTableWatermarks(watermarks);
+  }
 
   if (!fromDate) {
-    if (supabase) {
-      const last = await getLastUpdatedGameDate(supabase);
-      if (last) fromDate = addDaysISO(last, 1);
+    if (watermarks) {
+      const present = Object.entries(watermarks).filter(([, ts]) => !!ts);
+      if (present.length > 0) {
+        // Re-sync from the oldest table watermark date so lagging tables catch up.
+        const oldest = present.sort((a, b) => String(a[1]).localeCompare(String(b[1])))[0];
+        fromDate = isoDateFromTimestamp(oldest[1]);
+        console.log(`ℹ️ Using oldest table watermark: ${oldest[0]} @ ${oldest[1]}`);
+      }
     }
     if (!fromDate) fromDate = addDaysISO(toDate, -7);
   }

@@ -1,4 +1,5 @@
 import { FilterOptionButtons } from '@/components/filter-option-buttons';
+import { PlayerAvatar } from '@/components/player-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -15,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -581,10 +581,7 @@ export function AddPropForm({
         <View style={[styles.playerCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
           <View style={styles.playerCardHeader}>
             <View style={styles.avatarColumn}>
-              <Image
-                source={{ uri: item.athlete_headshot_href }}
-                style={[styles.playerItemImage, { backgroundColor: colors.border }]}
-              />
+              <PlayerAvatar uri={item.athlete_headshot_href} size={48} />
               <View
                 style={[
                   styles.avatarAvgBadge,
@@ -848,10 +845,7 @@ export function AddPropForm({
                       styles.selectedGroupCard,
                       // { borderColor: colors.border, backgroundColor: colors.background },
                     ]}>
-                    <Image
-                      source={{ uri: group.playerHeadshot }}
-                      style={[styles.selectedItemAvatar, { backgroundColor: colors.border }]}
-                    />
+                    <PlayerAvatar uri={group.playerHeadshot} size={22} />
                     <ThemedText style={styles.selectedGroupTitle}>{group.playerName}</ThemedText>
                   </View>
                   <View style={styles.selectedGroupItems}>
@@ -971,11 +965,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 96,
     alignItems: 'center',
-  },
-  playerItemImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
   },
   avatarAvgBadge: {
     position: 'absolute',
@@ -1127,11 +1116,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     // gap: 8,
-  },
-  selectedItemAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
   },
   selectedItemText: {
     fontSize: 11,

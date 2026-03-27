@@ -4,12 +4,19 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+/** Keep Seasonal Breakdown header and bar rows pixel-aligned. */
+export const TEAM_COMPARISON_LABEL_COLUMN_WIDTH = 144;
+export const TEAM_COMPARISON_ROW_GAP = 6;
+
 type TeamComparisonBarProps = {
   label: string;
   leftValue: number;
   rightValue: number;
   leftLabel: string;
   rightLabel: string;
+  /** League rank (1 = best) for seasonal breakdown; omit for screens without league context */
+  leftRank?: number | null;
+  rightRank?: number | null;
   leftColor?: string;
   rightColor?: string;
   /** Max value for bar scaling. If not provided, uses max(left, right) * 1.1 */
@@ -22,8 +29,21 @@ type TeamComparisonBarProps = {
   significanceThreshold?: number;
 };
 
-const MINOR_WIN_BG_COLOR = '#24d1692e';
-const SIGNIFICANT_WIN_BG_COLOR = '#24d1696e';
+/** e.g. 1 → "1st", 22 → "22nd" */
+export function formatOrdinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
 
 export const TeamComparisonBar = memo(function TeamComparisonBar({
   label,
@@ -31,17 +51,21 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
   rightValue,
   leftLabel,
   rightLabel,
+  leftRank,
+  rightRank,
   leftColor,
   rightColor,
   maxValue: maxValueProp,
   isPercent = false,
-  lowerIsBetter = false,
-  significanceThreshold,
+  lowerIsBetter: _lowerIsBetter = false,
+  significanceThreshold: _significanceThreshold,
 }: TeamComparisonBarProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const left = leftColor ?? '#e53935';
   const right = rightColor ?? '#2196F3';
+  /** Matches Seasonal Breakdown header halves (flex:1 + centered). */
+  const sideWidth = 104;
 
   const maxVal =
     maxValueProp ??
@@ -49,63 +73,70 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
   const leftPct = Math.min(1, Math.max(0, leftValue / maxVal));
   const rightPct = Math.min(1, Math.max(0, rightValue / maxVal));
 
-  const leftWins =
-    lowerIsBetter ? leftValue < rightValue : leftValue > rightValue;
-  const rightWins =
-    lowerIsBetter ? rightValue < leftValue : rightValue > leftValue;
-
-  const diff = Math.abs(leftValue - rightValue);
-  const isSignificant =
-    significanceThreshold != null && diff >= significanceThreshold;
-  const getWinBgColor = () => {
-    if (significanceThreshold == null) return MINOR_WIN_BG_COLOR;
-    return isSignificant ? SIGNIFICANT_WIN_BG_COLOR : MINOR_WIN_BG_COLOR;
-  };
-  const winBgColor = getWinBgColor();
-
   return (
-    <View style={styles.row}>
-      <View style={[styles.valueWrapper, styles.valueWrapperLeft]}>
-        <View
-          style={[
-            styles.valueInner,
-            leftWins && { backgroundColor: winBgColor },
-          ]}
-        >
-          <ThemedText style={[styles.value, styles.leftValue]} numberOfLines={1}>
-            {leftLabel}
-          </ThemedText>
+    <View style={[styles.row, { gap: TEAM_COMPARISON_ROW_GAP }]}>
+      <View style={styles.sideOuter}>
+        <View style={{ width: sideWidth }}>
+          <View style={styles.valueInner}>
+            <ThemedText style={[styles.valueLine, styles.leftValueLine]} numberOfLines={1}>
+              {leftRank != null ? (
+                <ThemedText style={[styles.rankSuffix, { color: colors.secondaryText }]}>
+                  {`${formatOrdinal(leftRank)} • `}
+                </ThemedText>
+              ) : null}
+              {leftLabel}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.barTrack,
+              styles.barTrackLeft,
+              { width: sideWidth, backgroundColor: colors.border + '60' },
+            ]}
+          >
+            <View
+              style={[
+                styles.barFill,
+                { width: `${leftPct * 100}%`, backgroundColor: left },
+              ]}
+            />
+          </View>
         </View>
       </View>
-      <View style={[styles.barTrack, styles.barTrackLeft, { backgroundColor: colors.border + '60' }]}>
-        <View
-          style={[
-            styles.barFill,
-            { width: `${leftPct * 100}%`, backgroundColor: left },
-          ]}
-        />
-      </View>
-      <ThemedText style={[styles.label, { color: colors.secondaryText }]} numberOfLines={1}>
+      <ThemedText
+        style={[
+          styles.label,
+          { width: TEAM_COMPARISON_LABEL_COLUMN_WIDTH, color: colors.secondaryText },
+        ]}
+        numberOfLines={1}>
         {label}
       </ThemedText>
-      <View style={[styles.barTrack, styles.barTrackRight, { backgroundColor: colors.border + '60' }]}>
-        <View
-          style={[
-            styles.barFill,
-            { width: `${rightPct * 100}%`, backgroundColor: right },
-          ]}
-        />
-      </View>
-      <View style={[styles.valueWrapper, styles.valueWrapperRight]}>
-        <View
-          style={[
-            styles.valueInner,
-            rightWins && { backgroundColor: winBgColor },
-          ]}
-        >
-          <ThemedText style={[styles.value, styles.rightValue]} numberOfLines={1}>
-            {rightLabel}
-          </ThemedText>
+      <View style={styles.sideOuter}>
+        <View style={{ width: sideWidth }}>
+          <View style={styles.valueInner}>
+            <ThemedText style={[styles.valueLine, styles.rightValueLine]} numberOfLines={1}>
+              {rightLabel}
+              {rightRank != null ? (
+                <ThemedText style={[styles.rankSuffix, { color: colors.secondaryText }]}>
+                  {` • ${formatOrdinal(rightRank)}`}
+                </ThemedText>
+              ) : null}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.barTrack,
+              styles.barTrackRight,
+              { width: sideWidth, backgroundColor: colors.border + '60' },
+            ]}
+          >
+            <View
+              style={[
+                styles.barFill,
+                { width: `${rightPct * 100}%`, backgroundColor: right },
+              ]}
+            />
+          </View>
         </View>
       </View>
     </View>
@@ -117,36 +148,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    gap: 6,
-    width: '100%'
+    width: '100%',
   },
-  valueWrapper: {
-    width: 50,
-  },
-  valueWrapperLeft: {
-    alignItems: 'flex-start',
-  },
-  valueWrapperRight: {
-    alignItems: 'flex-end',
+  /** Mirrors Seasonal Breakdown header halves (flex:1; content centered via inner 104px column). */
+  sideOuter: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    minWidth: 0,
   },
   valueInner: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginBottom: 2,
     borderRadius: 4,
-    // width: '100%',
   },
-  value: {
-    fontSize: 12,
+  valueLine: {
+    fontSize: 11,
     fontWeight: '600',
   },
-  leftValue: {
-    textAlign: 'left',
+  rankSuffix: {
+    fontSize: 11,
+    fontWeight: '500',
   },
-  rightValue: {
+  leftValueLine: {
     textAlign: 'right',
   },
+  rightValueLine: {
+    textAlign: 'left',
+  },
   barTrack: {
-    width: 65,
     height: 8,
     borderRadius: 4,
     overflow: 'hidden',
@@ -154,8 +185,6 @@ const styles = StyleSheet.create({
   },
   barTrackLeft: {
     justifyContent: 'flex-end',
-    // borderWidth: 1,
-    // borderColor: 'yellow'
   },
   barTrackRight: {
     justifyContent: 'flex-start',
@@ -167,8 +196,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '500',
-    flex: 1,
-    flexShrink: 1,
+    flexShrink: 0,
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
 });

@@ -1,3 +1,4 @@
+import { PlayerAvatar } from '@/components/player-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,7 +11,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Platform,
   ScrollView,
@@ -129,10 +129,7 @@ export function SimilarPlayersModal({
                   key={player.athlete_id}
                   style={[styles.playerCard, { borderColor: colors.border }]}>
                   <View style={styles.playerHeader}>
-                    <Image
-                      source={{ uri: player.athlete_headshot_href }}
-                      style={[styles.avatar, { backgroundColor: colors.border }]}
-                    />
+                    <PlayerAvatar uri={player.athlete_headshot_href} size={48} />
                     <View style={styles.playerInfo}>
                       <ThemedText style={styles.playerName}>
                         {player.athlete_display_name}
@@ -252,11 +249,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
   },
   playerInfo: {
     flex: 1,

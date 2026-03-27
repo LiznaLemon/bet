@@ -1,9 +1,12 @@
-import Feather from '@expo/vector-icons/Feather';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { RiveScheduleTabIcon } from '@/components/rive-schedule-tab-icon';
+import {
+  RivePlayersTabIcon,
+  RivePropsTabIcon,
+  RiveScheduleTabIcon,
+} from '@/components/rive-schedule-tab-icon';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -12,16 +15,21 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      lazy
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarItemStyle: {
+          paddingVertical: 6,
+        },
         tabBarStyle: {
           backgroundColor: '#000000',
-          borderTopColor: 'rgba(128, 128, 128, 0.35)',
-          borderTopWidth: 1,
-          paddingTop: 8,
+          borderTopColor: 'rgba(37, 37, 37, 0.5)',
+          // borderTopColor: Colors[colorScheme ?? 'light'].secondaryText,
+          borderTopWidth: 0.2,
+          paddingTop: 10,
+          paddingBottom: 10,
+          minHeight: 60,
         },
         tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].secondaryText,
       }}>
@@ -36,14 +44,14 @@ export default function TabLayout() {
         name="players"
         options={{
           title: 'Players',
-          tabBarIcon: ({ color }) => <Feather name="users" size={24} color={color} />,
+          tabBarIcon: () => <RivePlayersTabIcon />,
         }}
       />
       <Tabs.Screen
         name="props"
         options={{
           title: 'Props',
-          tabBarIcon: ({ color }) => <Feather name="clipboard" size={24} color={color} />,
+          tabBarIcon: () => <RivePropsTabIcon />,
         }}
       />
     </Tabs>

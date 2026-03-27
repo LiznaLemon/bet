@@ -5,12 +5,14 @@ import {
   type ESPNGameSummary,
 } from '@/lib/api/espn-live';
 import type { GameBoxScore } from '@/lib/queries/game-boxscores';
+import { upsertGameInjuryReportsFromEspn } from '@/lib/queries/game-injury-reports';
 import type { PlayByPlayRecord } from '@/lib/queries/play-by-play';
 import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 import { useQuery } from '@tanstack/react-query';
 
 const STATUS_FINAL = 'STATUS_FINAL';
 const DEFAULT_POLL_MS = 12_000;
+const INJURY_REPORT_SEASON = 2026;
 
 export type ESPNInjuryEntry = {
   teamAbbrev: string;
@@ -34,6 +36,8 @@ export type ESPNLiveGameResult = {
   awayTeam: string | null;
   homeTeam: string | null;
   injuries: ESPNInjuryEntry[];
+  /** ISO timestamp when this payload was fetched from ESPN. */
+  fetchedAt: string;
 };
 
 export function useESPNLiveGame(
@@ -74,6 +78,9 @@ export function useESPNLiveGame(
         }
       }
 
+      const fetchedAt = new Date().toISOString();
+      void upsertGameInjuryReportsFromEspn(gameId!, INJURY_REPORT_SEASON, injuries).catch(() => {});
+
       return {
         plays: mappedPlays,
         boxScores,
@@ -86,6 +93,7 @@ export function useESPNLiveGame(
         awayTeam: away?.team?.abbreviation ?? null,
         homeTeam: home?.team?.abbreviation ?? null,
         injuries,
+        fetchedAt,
       };
     },
     enabled: !!gameId && enabled,

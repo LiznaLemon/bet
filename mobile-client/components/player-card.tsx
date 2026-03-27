@@ -1,8 +1,8 @@
 import { MiniBarChart } from '@/components/mini-bar-chart';
+import { PlayerAvatar } from '@/components/player-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -82,11 +82,7 @@ function PlayerCardComponent({
         ]}
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
         <View style={styles.playerInfo}>
-          <Image
-            source={{ uri: player.athlete_headshot_href }}
-            style={[styles.playerImage, { backgroundColor: Colors[colorScheme].border }]}
-            contentFit="cover"
-          />
+          <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -124,11 +120,7 @@ function PlayerCardComponent({
           { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
-        <Image
-          source={{ uri: player.athlete_headshot_href }}
-          style={[styles.playerImageSmall, { backgroundColor: Colors[colorScheme].border }]}
-          contentFit="cover"
-        />
+        <PlayerAvatar uri={player.athlete_headshot_href} size={40} />
         <View style={styles.compactInfo}>
           <View style={styles.nameRow}>
             <View style={styles.rankSlot}>
@@ -160,11 +152,7 @@ function PlayerCardComponent({
         ]}
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
         <View style={styles.detailedHeader}>
-          <Image
-            source={{ uri: player.athlete_headshot_href }}
-            style={[styles.playerImageLarge, { backgroundColor: Colors[colorScheme].border }]}
-            contentFit="cover"
-          />
+          <PlayerAvatar uri={player.athlete_headshot_href} size={60} />
           <View style={styles.detailedInfo}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -214,11 +202,7 @@ function PlayerCardComponent({
         ]}
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
         <View style={styles.playerInfo}>
-          <Image
-            source={{ uri: player.athlete_headshot_href }}
-            style={[styles.playerImage, { backgroundColor: Colors[colorScheme].border }]}
-            contentFit="cover"
-          />
+          <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -249,11 +233,7 @@ function PlayerCardComponent({
         onPress={() => router.push(`/player/${player.athlete_id}`)}>
         {/* Player Image */}
         <View style={styles.longHeaderColumn}>
-          <Image
-            source={{ uri: player.athlete_headshot_href }}
-            style={[styles.playerImageLong, { backgroundColor: Colors[colorScheme].border }]}
-            contentFit="cover"
-          />
+          <PlayerAvatar uri={player.athlete_headshot_href} size={48} style={styles.playerImageLong} />
           <View style={[styles.statValueContainer, { borderWidth: 1, borderColor: Colors[colorScheme].border, backgroundColor: Colors[colorScheme].cardBackground }]}>
             <ThemedText style={styles.statAverageLong}>
               {currentStatValue} {statLabel}
@@ -318,11 +298,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  playerImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
   playerDetails: {
     marginLeft: 12,
     flex: 1,
@@ -357,11 +332,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
-  },
-  playerImageSmall: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
   },
   compactInfo: {
     flex: 1,
@@ -398,11 +368,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  playerImageLarge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
   },
   detailedInfo: {
     flex: 1,
@@ -466,9 +431,6 @@ const styles = StyleSheet.create({
     height: 100,
   },
   playerImageLong: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     marginTop: 4,
   },
   longContentContainer: {

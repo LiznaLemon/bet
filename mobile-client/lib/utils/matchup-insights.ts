@@ -2,12 +2,43 @@ import type { GameLogEntry, Player, ScheduleGame } from '@/lib/types';
 import type { TeamRecentResults } from '@/lib/queries/schedule';
 import type { TeamDefensiveStats } from '@/lib/queries/team-defensive-stats';
 import type { TeamOffensiveStats } from '@/lib/queries/team-offensive-stats';
-import { getAbbrevAliases } from '@/lib/utils/team-abbreviation';
+import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 
 function teamMatches(teamAbbrev: string, gameAbbrev: string): boolean {
   const aliases = getAbbrevAliases(gameAbbrev.toUpperCase().trim());
   return aliases.includes((teamAbbrev ?? '').toUpperCase().trim());
 }
+
+/** Same eligibility rules as GameMatchupView activeAwayPlayers / activeHomePlayers (including empty-set = full roster). */
+export function getMatchupEligiblePlayers(
+  players: Player[],
+  awayAbbrev: string,
+  homeAbbrev: string,
+  activeAwayIds: Set<string>,
+  activeHomeIds: Set<string>,
+  excludeAthleteIds?: Set<string>
+): Player[] {
+  const exclude = excludeAthleteIds ?? new Set<string>();
+  const away = (awayAbbrev ?? '').trim();
+  const home = (homeAbbrev ?? '').trim();
+  if (!away || !home) return [];
+
+  return players.filter((p) => {
+    if (exclude.has(p.athlete_id)) return false;
+    const abbrev = p.team_abbreviation ?? '';
+    const isAway = teamMatches(abbrev, away);
+    const isHome = teamMatches(abbrev, home);
+    if (!isAway && !isHome) return false;
+    if (isAway) {
+      if (!activeAwayIds.size) return true;
+      return activeAwayIds.has(p.athlete_id);
+    }
+    if (!activeHomeIds.size) return true;
+    return activeHomeIds.has(p.athlete_id);
+  });
+}
+
+export type MatchupPointInTimeStats = Record<string, { ppg: number; apg: number }>;
 
 type GameInfo = {
   awayTeamAbbrev: string;
@@ -147,24 +178,13 @@ function getTeamStrengthInsights(
 }
 
 function getPlayerTrendInsights(
-  players: Player[],
-  awayAbbrev: string,
-  homeAbbrev: string,
-  activeAwayIds: Set<string>,
-  activeHomeIds: Set<string>
+  eligible: Player[],
 ): string[] {
   const insights: string[] = [];
   const minGames = 15;
   const minDiff = 3;
 
-  for (const p of players) {
-    const abbrev = p.team_abbreviation ?? '';
-    const isAway = teamMatches(abbrev, awayAbbrev);
-    const isHome = teamMatches(abbrev, homeAbbrev);
-    if (!isAway && !isHome) continue;
-    const isActive = isAway ? activeAwayIds.has(p.athlete_id) : activeHomeIds.has(p.athlete_id);
-    if (!isActive) continue;
-
+  for (const p of eligible) {
     const log = (p.game_log ?? []) as GameLogEntry[];
     if (log.length < minGames) continue;
 
@@ -179,8 +199,9 @@ function getPlayerTrendInsights(
     if (Math.abs(diff) >= minDiff) {
       const dir = diff > 0 ? 'up' : 'down';
       const name = p.athlete_display_name ?? 'Player';
+      const tabbrev = toThreeLetterAbbrev(p.team_abbreviation);
       insights.push(
-        `${name} (${p.team_abbreviation}) is ${dir} ${Math.abs(diff).toFixed(1)} PPG over his last 5 vs season.`
+        `${name} (${tabbrev}) is ${dir} ${Math.abs(diff).toFixed(1)} PPG over his last 5 vs season.`
       );
     }
   }
@@ -209,39 +230,37 @@ function getOffensiveSlumpInsight(
   return insights;
 }
 
-function getTopPlayerInsights(
-  players: Player[],
-  awayAbbrev: string,
-  homeAbbrev: string,
-  activeAwayIds: Set<string>,
-  activeHomeIds: Set<string>
-): string[] {
+function playerPpgForInsight(p: Player, pointInTime?: MatchupPointInTimeStats): number {
+  const pit = pointInTime?.[p.athlete_id];
+  if (pit != null && Number.isFinite(pit.ppg)) return pit.ppg;
+  return Number(p.ppg) || 0;
+}
+
+function playerApgForInsight(p: Player, pointInTime?: MatchupPointInTimeStats): number {
+  const pit = pointInTime?.[p.athlete_id];
+  if (pit != null && Number.isFinite(pit.apg)) return pit.apg;
+  return Number(p.apg) || 0;
+}
+
+function getTopPlayerInsights(eligible: Player[], pointInTime?: MatchupPointInTimeStats): string[] {
   const insights: string[] = [];
-  const matchupPlayers = players.filter((p) => {
-    const abbrev = p.team_abbreviation ?? '';
-    const isAway = teamMatches(abbrev, awayAbbrev);
-    const isHome = teamMatches(abbrev, homeAbbrev);
-    if (!isAway && !isHome) return false;
-    return isAway ? activeAwayIds.has(p.athlete_id) : activeHomeIds.has(p.athlete_id);
-  });
+  if (eligible.length === 0) return insights;
 
-  const byPpg = [...matchupPlayers].sort(
-    (a, b) => (Number(b.ppg) || 0) - (Number(a.ppg) || 0)
+  const byPpg = [...eligible].sort(
+    (a, b) => playerPpgForInsight(b, pointInTime) - playerPpgForInsight(a, pointInTime)
   );
-  if (byPpg.length >= 1) {
-    const top = byPpg[0];
-    insights.push(
-      `${top.athlete_display_name} leads both teams in scoring (${top.ppg} PPG).`
-    );
-  }
+  const topPpg = byPpg[0];
+  insights.push(
+    `${topPpg.athlete_display_name} leads both teams in scoring (${playerPpgForInsight(topPpg, pointInTime).toFixed(1)} PPG).`
+  );
 
-  const byApg = [...matchupPlayers].sort(
-    (a, b) => (Number(b.apg) || 0) - (Number(a.apg) || 0)
+  const byApg = [...eligible].sort(
+    (a, b) => playerApgForInsight(b, pointInTime) - playerApgForInsight(a, pointInTime)
   );
-  if (byApg.length >= 1 && byApg[0].athlete_id !== byPpg[0]?.athlete_id) {
+  if (byApg.length >= 1 && byApg[0].athlete_id !== topPpg.athlete_id) {
     const top = byApg[0];
     insights.push(
-      `${top.athlete_display_name} leads both teams in assists (${top.apg} APG).`
+      `${top.athlete_display_name} leads both teams in assists (${playerApgForInsight(top, pointInTime).toFixed(1)} APG).`
     );
   }
 
@@ -276,21 +295,36 @@ export function computeTeamMatchupInsights(
   return insights.filter(Boolean).slice(0, 24);
 }
 
+export type ComputePlayerMatchupInsightsOptions = {
+  excludeAthleteIds?: Set<string>;
+  pointInTimeByPlayerId?: MatchupPointInTimeStats;
+};
+
 /** Player-related insights: top scorers, assists leaders, player trends. */
 export function computePlayerMatchupInsights(
   game: GameInfo,
   players: Player[],
   activeAwayIds: Set<string>,
-  activeHomeIds: Set<string>
+  activeHomeIds: Set<string>,
+  options?: ComputePlayerMatchupInsightsOptions
 ): string[] {
   const awayAbbrev = game.awayTeamAbbrev ?? '';
   const homeAbbrev = game.homeTeamAbbrev ?? '';
   if (!awayAbbrev || !homeAbbrev) return [];
 
+  const eligible = getMatchupEligiblePlayers(
+    players,
+    awayAbbrev,
+    homeAbbrev,
+    activeAwayIds,
+    activeHomeIds,
+    options?.excludeAthleteIds
+  );
+
   const insights: string[] = [];
 
-  insights.push(...getTopPlayerInsights(players, awayAbbrev, homeAbbrev, activeAwayIds, activeHomeIds));
-  insights.push(...getPlayerTrendInsights(players, awayAbbrev, homeAbbrev, activeAwayIds, activeHomeIds));
+  insights.push(...getTopPlayerInsights(eligible, options?.pointInTimeByPlayerId));
+  insights.push(...getPlayerTrendInsights(eligible));
 
   return insights.filter(Boolean).slice(0, 12);
 }

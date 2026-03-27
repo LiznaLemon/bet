@@ -1,4 +1,5 @@
 import { InsightCarousel } from '@/components/insight-carousel';
+import { PlayerAvatar } from '@/components/player-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -11,7 +12,6 @@ import {
   formatPropDescription,
 } from '@/lib/props/compute-prop-stats';
 import type { GameLogEntry, ScheduleGame } from '@/lib/types';
-import { Image } from 'expo-image';
 import { useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -53,7 +53,7 @@ export function PropCard({ prop, player, scheduleGames, otherPropsForSamePlayer 
     <ThemedView style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
       <View style={styles.header}>
         <View style={styles.playerRow}>
-          <Image source={{ uri: player.athlete_headshot_href }} style={[styles.headshot, { backgroundColor: colors.border }]} />
+          <PlayerAvatar uri={player.athlete_headshot_href} size={44} />
           <View style={styles.playerInfo}>
             <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
             <ThemedText style={styles.propDescription}>{formatPropDescription(prop)}</ThemedText>
@@ -103,11 +103,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
-  },
-  headshot: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
   },
   playerInfo: {
     flex: 1,

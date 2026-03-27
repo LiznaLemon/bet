@@ -86,7 +86,7 @@ export type PaginatedPlayer = Player & {
   stat_rank?: number;
 };
 
-type PaginatedPlayersPage = {
+export type PaginatedPlayersPage = {
   players: PaginatedPlayer[];
   totalCount: number;
   nextOffset: number | undefined;
@@ -132,7 +132,7 @@ export function usePlayersPaginated(
     queryFn: ({ pageParam = 0 }) =>
       fetchPlayersPaginated(season, search, sortBy, pageParam),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    getNextPageParam: (lastPage: PaginatedPlayersPage) => lastPage.nextOffset,
     staleTime: 5 * 60 * 1000,
     enabled,
   });
@@ -145,7 +145,7 @@ export function prefetchPlayersFirstPage(season = 2026, sortBy = 'ppg') {
     queryFn: ({ pageParam = 0 }) =>
       fetchPlayersPaginated(season, null, sortBy, pageParam),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    getNextPageParam: (lastPage: PaginatedPlayersPage) => lastPage.nextOffset,
     staleTime: 5 * 60 * 1000,
   });
 }

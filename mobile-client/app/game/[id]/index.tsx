@@ -165,6 +165,7 @@ export default function GameDetailScreen() {
             players={players}
             boxScores={boxScores}
             injuries={espnData?.injuries ?? []}
+            liveDataFetchedAt={espnData?.fetchedAt}
           />
         ) : (
           <GameLiveView

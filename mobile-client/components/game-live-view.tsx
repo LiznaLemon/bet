@@ -1,6 +1,7 @@
 import { FilterOptionButtons } from '@/components/filter-option-buttons';
 import { GameMatchupDisplay } from '@/components/game-matchup-display';
 import { InsightCarousel } from '@/components/insight-carousel';
+import { PlayerAvatar } from '@/components/player-avatar';
 // import { PropProgressLine } from '@/components/prop-progress-line';
 import { RiveProgressBar } from '@/components/rive-progress-bar';
 import { TeamComparisonBar } from '@/components/team-comparison-bar';
@@ -48,7 +49,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -538,10 +538,7 @@ export function GameLiveView({
                       <View
                         key={player.athlete_id}
                         style={[styles.playerStatRow, { backgroundColor: colors.background }]}>
-                        <Image
-                          source={{ uri: player.athlete_headshot_href }}
-                          style={[styles.headshot, { backgroundColor: colors.border }]}
-                        />
+                        <PlayerAvatar uri={player.athlete_headshot_href} size={40} style={styles.headshotMargin} />
                         <View style={styles.playerStatInfo}>
                           <View style={styles.playerNameRow}>
                             <ThemedText style={styles.playerName} numberOfLines={1}>
@@ -938,10 +935,7 @@ function LivePropCard({
       <View style={styles.propHeader}>
         <View style={styles.propPlayerRow}>
           <View style={styles.headshotWrapper}>
-            <Image
-              source={{ uri: player.athlete_headshot_href }}
-              style={[styles.headshot, { backgroundColor: colors.border }]}
-            />
+            <PlayerAvatar uri={player.athlete_headshot_href} size={40} style={styles.headshotMargin} />
             {isSingleProp(prop) && liveInsight && showBadge && (
               <View
                 style={[
@@ -1145,10 +1139,10 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   section: {
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(37, 37, 37, 0.95)',
   },
   sectionTitle: {
     fontSize: 16,
@@ -1244,10 +1238,7 @@ const styles = StyleSheet.create({
   headshotWrapper: {
     position: 'relative',
   },
-  headshot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headshotMargin: {
     marginRight: 12,
   },
   hitMissBadge: {

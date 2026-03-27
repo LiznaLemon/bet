@@ -24,6 +24,7 @@ bet_backend/coverage.out
 # Node / React Native / Expo
 node_modules/
 .expo/
+mobile-client/.expo/
 dist/
 *.tsbuildinfo
 expo-env.d.ts

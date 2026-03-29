@@ -111,7 +111,7 @@ async function main() {
   }
 
   const toDate = args.to ?? todayISO();
-  let fromDate = args.from;
+  let fromDate = args.from; // Start with user-provided from date if exists
   let watermarks = null;
 
   if (supabase) {
@@ -119,19 +119,36 @@ async function main() {
     printTableWatermarks(watermarks);
   }
 
+  // Only use watermark logic if user did NOT provide a --from flag
   if (!fromDate) {
     if (watermarks) {
       const present = Object.entries(watermarks).filter(([, ts]) => !!ts);
       if (present.length > 0) {
         const oldest = present.sort((a, b) => String(a[1]).localeCompare(String(b[1])))[0];
         fromDate = isoDateFromTimestamp(oldest[1]);
-        console.log(`ℹ️ Using oldest table watermark: ${oldest[0]} @ ${oldest[1]}`);
+        console.log(`ℹ️ No --from provided. Using oldest table watermark: ${oldest[0]} @ ${oldest[1]}`);
       }
     }
-    if (!fromDate) fromDate = addDaysISO(toDate, -7);
+    // If still no fromDate, fall back to 7 days ago
+    if (!fromDate) {
+      fromDate = addDaysISO(toDate, -7);
+      console.log(`ℹ️ No watermark found. Using default: last 7 days (from ${fromDate})`);
+    }
+  } else {
+    console.log(`ℹ️ Using user-provided --from date: ${fromDate}`);
   }
 
-  if (fromDate > toDate) {
+  console.log(`📅 Date range calculated:`);
+  console.log(`   From: ${fromDate}`);
+  console.log(`   To: ${toDate}`);
+  console.log(`   Start date object: ${new Date(fromDate)}`);
+  console.log(`   End date object: ${new Date(toDate)}`);
+
+  // Convert to Date objects for proper comparison
+  const startDate = new Date(fromDate);
+  const endDate = new Date(toDate);
+
+  if (startDate > endDate) {
     console.log(`ℹ️ Nothing to sync (from ${fromDate} is after to ${toDate}).`);
     return;
   }
@@ -141,19 +158,38 @@ async function main() {
 
   let totalGames = 0;
   const failedGames = [];
+  let processedDates = [];
 
-  for (let dateISO = fromDate; dateISO <= toDate; dateISO = addDaysISO(dateISO, 1)) {
-    const ymd = dateISO.replace(/-/g, '');
+  // Iterate using Date objects to ensure proper day-by-day progression
+  let currentDate = new Date(startDate);
+  while (currentDate <= endDate) {
+    // Format date for API call (YYYYMMDD)
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const ymd = `${year}${month}${day}`;
+    const dateISO = `${year}-${month}-${day}`;
+
+    processedDates.push(dateISO);
+    console.log(`\n🔍 Processing date: ${dateISO} (API format: ${ymd})`);
+
     let events;
     try {
       events = await fetchScoreboard(ymd);
+      console.log(`   Found ${events?.length || 0} games`);
     } catch (e) {
       console.error(`❌ Scoreboard ${dateISO}:`, e.message);
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
       continue;
     }
 
-    console.log(`📅 ${dateISO}: ${events.length} final game(s)`);
-    if (events.length === 0) continue;
+    if (!events || events.length === 0) {
+      console.log(`   No games found for ${dateISO}`);
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+      continue;
+    }
 
     for (const ev of events) {
       const gameId = ev.game_id;
@@ -172,9 +208,15 @@ async function main() {
       }
       await sleep(1000);
     }
+
+    // Move to next day
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  console.log(`\n✅ Completed. Processed ${totalGames} games.`);
+  console.log(`\n\n📊 Summary:`);
+  console.log(`   Dates processed: ${processedDates.join(', ')}`);
+  console.log(`   Total games processed: ${totalGames}`);
+  console.log(`   Failed games: ${failedGames.length}`);
 
   if (failedGames.length > 0) {
     console.warn(`⚠️ Failed games: ${failedGames.map((g) => g.gameId).join(', ')}`);

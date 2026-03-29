@@ -16,6 +16,22 @@ function normalizeName(name: string): string {
     .trim();
 }
 
+export function athleteIdFromInjuryEntry(
+  players: Player[],
+  inj: ESPNInjuryEntry,
+  gameAwayAbbrev: string,
+  gameHomeAbbrev: string
+): string | null {
+  if (!injuryStatusMeansDefinitelyOut(inj.status)) return null;
+  if (!injuryBelongsToGameTeam(inj, gameAwayAbbrev, gameHomeAbbrev)) return null;
+  for (const p of players) {
+    if (namesMatchInjuryToPlayer(inj.playerName, p)) {
+      return p.athlete_id;
+    }
+  }
+  return null;
+}
+
 function namesMatchInjuryToPlayer(injuryName: string, p: Player): boolean {
   const inj = normalizeName(injuryName);
   if (inj.length < 2) return false;
@@ -50,16 +66,9 @@ export function athleteIdsOutFromInjuries(
 ): Set<string> {
   const ids = new Set<string>();
   if (!injuries.length) return ids;
-
   for (const inj of injuries) {
-    if (!injuryStatusMeansDefinitelyOut(inj.status)) continue;
-    if (!injuryBelongsToGameTeam(inj, gameAwayAbbrev, gameHomeAbbrev)) continue;
-    for (const p of players) {
-      if (namesMatchInjuryToPlayer(inj.playerName, p)) {
-        ids.add(p.athlete_id);
-        break;
-      }
-    }
+    const id = athleteIdFromInjuryEntry(players, inj, gameAwayAbbrev, gameHomeAbbrev);
+    if (id) ids.add(id);
   }
   return ids;
 }

@@ -12,6 +12,12 @@ import { ThemedText } from '@/components/themed-text';
 import { getTeamColor } from '@/constants/team-colors';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
+import {
+  getPlayerSeasonAvgFromTotals,
+  getSeasonAvgFromGameLog,
+  getStatFromGameLog,
+} from '@/lib/props/compute-prop-stats';
 import { type ESPNInjuryEntry } from '@/lib/queries/espn-live-game';
 import { type GameBoxScore, useGameBoxScores } from '@/lib/queries/game-boxscores';
 import { usePlayerStatRanks } from '@/lib/queries/players';
@@ -20,6 +26,7 @@ import { useTeamMatchupContext } from '@/lib/queries/team-matchup-context';
 import { useGameMatchupBundle } from '@/lib/queries/team-offensive-stats';
 import { supabase } from '@/lib/supabase';
 import type { GameLogEntry, Player, ScheduleGame } from '@/lib/types';
+import type { PropStatKey } from '@/lib/types/props';
 import {
   aggregateBoxScoresByTeam,
 } from '@/lib/utils/game-team-stats';
@@ -30,6 +37,7 @@ import {
   computePlayerMatchupInsights,
   computeTeamMatchupInsights,
   getMatchupEligiblePlayers,
+  teamMatches,
 } from '@/lib/utils/matchup-insights';
 import type { SimilarPlayerWithGames } from '@/lib/utils/player-similarity';
 import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
@@ -50,30 +58,67 @@ import {
 
 const SEASON = 2026;
 
-const KEY_MATCHUP_STAT_OPTIONS: { key: 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg'; label: string }[] = [
-  { key: 'ppg', label: 'PTS' },
-  { key: 'rpg', label: 'REB' },
-  { key: 'apg', label: 'AST' },
-  { key: 'spg', label: 'STL' },
-  { key: 'bpg', label: 'BLK' },
-];
+/** Injury "lead X is out" lines only: box / shooting roles, not minutes or turnovers. */
+const PROP_STATS_FOR_INJURY_LEAD_HIGHLIGHT: PropStatKey[] = PROP_STAT_OPTIONS.map((o) => o.key).filter(
+  (k) => k !== 'minutes' && k !== 'turnovers'
+);
 
-function getPlayerStatValue(p: Player, stat: 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg'): number {
-  return Number(p[stat]) || 0;
+function buildPropStatPitByPlayerId(
+  playerList: Player[],
+  gameDate: string | null
+): Record<string, Record<PropStatKey, number>> {
+  const result: Record<string, Record<PropStatKey, number>> = {};
+  for (const p of playerList) {
+    const log = (p.game_log ?? []) as GameLogEntry[];
+    const filtered = gameDate ? log.filter((g) => (g.game_date ?? '') < gameDate) : log;
+    const row = {} as Record<PropStatKey, number>;
+    for (const { key } of PROP_STAT_OPTIONS) {
+      row[key] =
+        filtered.length > 0
+          ? getSeasonAvgFromGameLog(filtered, key)
+          : getPlayerSeasonAvgFromTotals(p, key);
+    }
+    result[p.athlete_id] = row;
+  }
+  return result;
 }
 
-function getStatLabel(stat: 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg'): string {
-  const map: Record<string, string> = { ppg: 'PPG', rpg: 'RPG', apg: 'APG', spg: 'SPG', bpg: 'BPG' };
-  return map[stat] ?? stat;
+function otherPropStatKeysForRow(selected: PropStatKey): PropStatKey[] {
+  return PROP_STAT_OPTIONS.map((o) => o.key).filter((k) => k !== selected).slice(0, 3);
 }
 
-const GAME_LOG_STAT_KEY: Record<'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg', keyof GameLogEntry> = {
-  ppg: 'points',
-  rpg: 'rebounds',
-  apg: 'assists',
-  spg: 'steals',
-  bpg: 'blocks',
-};
+function getLeadRoleNoun(stat: PropStatKey): string {
+  const map: Record<PropStatKey, string> = {
+    points: 'scorer',
+    rebounds: 'rebounder',
+    assists: 'passer',
+    steals: 'steal leader',
+    blocks: 'shot blocker',
+    minutes: 'minutes leader',
+    turnovers: 'turnovers leader',
+    fouls: 'fouls leader',
+    two_pt_made: 'two-point maker',
+    three_pt_made: 'three-point shooter',
+    free_throws_made: 'free throw shooter',
+  };
+  return map[stat];
+}
+
+function joinLeadRoles(roles: string[]): string {
+  if (roles.length === 0) return '';
+  if (roles.length === 1) return roles[0];
+  if (roles.length === 2) return `${roles[0]} and ${roles[1]}`;
+  return `${roles.slice(0, -1).join(', ')}, and ${roles[roles.length - 1]}`;
+}
+
+function formatSidelinedLeaderBody(
+  teamAbbrev: string,
+  playerDisplayName: string,
+  stats: Array<{ stat: PropStatKey; value: number }>
+): string {
+  const rolesPhrase = joinLeadRoles(stats.map((s) => getLeadRoleNoun(s.stat)));
+  return `Lead ${teamAbbrev} ${rolesPhrase} ${playerDisplayName} is listed out.`;
+}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -88,10 +133,15 @@ function getGamesVsOpponent(gameLog: GameLogEntry[], opp: string): GameLogEntry[
   );
 }
 
-function avgStat(games: GameLogEntry[], key: keyof GameLogEntry): number {
-  if (!games.length) return 0;
-  const sum = games.reduce((s, g) => s + ((g[key] as number) ?? 0), 0);
-  return sum / games.length;
+function propStatShortLabel(stat: PropStatKey): string {
+  return PROP_STAT_OPTIONS.find((o) => o.key === stat)?.label ?? PROP_STAT_PLAYER_ROW_LABEL[stat];
+}
+
+function formatVsOpponentSingleGameValue(val: number): string {
+  if (Number.isInteger(val) || Math.abs(val - Math.round(val)) < 1e-6) {
+    return String(Math.round(val));
+  }
+  return val.toFixed(1);
 }
 
 function getMatchupTeamColors(awayAbbrev: string, homeAbbrev: string): { awayColor: string; homeColor: string } {
@@ -292,7 +342,7 @@ export function GameMatchupView({
   const [breakdownStatType, setBreakdownStatType] = useState<'offense' | 'defense'>('offense');
   const [previousMatchupIndex, setPreviousMatchupIndex] = useState(0);
   const [previousMatchupExpanded, setPreviousMatchupExpanded] = useState(false);
-  const [keyMatchupStat, setKeyMatchupStat] = useState<'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg'>('ppg');
+  const [keyMatchupStat, setKeyMatchupStat] = useState<PropStatKey>('points');
 
   const displayAwayAbbrev = useMemo(
     () => toThreeLetterAbbrev((game.awayTeamAbbrev ?? '').toUpperCase().trim()),
@@ -396,7 +446,7 @@ export function GameMatchupView({
 
   useEffect(() => {
     setPreviousMatchupExpanded(false);
-  }, [previousMatchupIndex]);
+  }, [game.id]);
 
   const seasonSeriesRecord = useMemo(() => {
     if (!previousMatchups.length) return null;
@@ -470,6 +520,63 @@ export function GameMatchupView({
       ),
     [matchupEligiblePlayers, displayHomeAbbrev]
   );
+
+  const fullRosterAwayPlayers = useMemo(
+    () => players.filter((p) => teamMatches(p.team_abbreviation ?? '', game.awayTeamAbbrev ?? '')),
+    [players, game.awayTeamAbbrev]
+  );
+  const fullRosterHomePlayers = useMemo(
+    () => players.filter((p) => teamMatches(p.team_abbreviation ?? '', game.homeTeamAbbrev ?? '')),
+    [players, game.homeTeamAbbrev]
+  );
+
+  const pointInTimeStatsFullRosterByPlayerId = useMemo(
+    () => buildPropStatPitByPlayerId([...fullRosterAwayPlayers, ...fullRosterHomePlayers], game.gameDate ?? null),
+    [fullRosterAwayPlayers, fullRosterHomePlayers, game.gameDate]
+  );
+
+  const sidelinedStatLeaderLines = useMemo(() => {
+    if (!injuredOutAthleteIds.size) return [];
+    const statKeys = PROP_STATS_FOR_INJURY_LEAD_HIGHLIGHT;
+
+    const linesForSide = (teamAbbrev: string, teamPlayers: Player[]) => {
+      const byPlayer = new Map<
+        string,
+        { player: Player; stats: Array<{ stat: PropStatKey; value: number }> }
+      >();
+      for (const stat of statKeys) {
+        if (!teamPlayers.length) continue;
+        const sorted = [...teamPlayers].sort((a, b) => {
+          const aVal = pointInTimeStatsFullRosterByPlayerId[a.athlete_id]?.[stat] ?? 0;
+          const bVal = pointInTimeStatsFullRosterByPlayerId[b.athlete_id]?.[stat] ?? 0;
+          return bVal - aVal;
+        });
+        const top = sorted[0];
+        if (!top || !injuredOutAthleteIds.has(top.athlete_id)) continue;
+        const value = pointInTimeStatsFullRosterByPlayerId[top.athlete_id]?.[stat] ?? 0;
+        const cur = byPlayer.get(top.athlete_id);
+        if (cur) cur.stats.push({ stat, value });
+        else byPlayer.set(top.athlete_id, { player: top, stats: [{ stat, value }] });
+      }
+      return [...byPlayer.values()].map((v) => ({
+        teamAbbrev,
+        player: v.player,
+        stats: v.stats,
+      }));
+    };
+
+    return [
+      ...linesForSide(displayAwayAbbrev, fullRosterAwayPlayers),
+      ...linesForSide(displayHomeAbbrev, fullRosterHomePlayers),
+    ];
+  }, [
+    injuredOutAthleteIds,
+    displayAwayAbbrev,
+    displayHomeAbbrev,
+    fullRosterAwayPlayers,
+    fullRosterHomePlayers,
+    pointInTimeStatsFullRosterByPlayerId,
+  ]);
 
   const breakdownTeamColors = useMemo(
     () => getMatchupTeamColors(game.awayTeamAbbrev ?? '', game.homeTeamAbbrev ?? ''),
@@ -762,31 +869,17 @@ export function GameMatchupView({
     displayAwayAbbrev,
   ]);
 
-  const pointInTimeStatsByPlayerId = useMemo(() => {
-    const gameDate = game.gameDate ?? null;
-    const allPlayers = [...activeAwayPlayers, ...activeHomePlayers];
-    const result: Record<string, Record<'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg', number>> = {};
-    for (const p of allPlayers) {
-      const log = (p.game_log ?? []) as GameLogEntry[];
-      const filtered = gameDate ? log.filter((g) => (g.game_date ?? '') < gameDate) : log;
-      const avg = (key: keyof GameLogEntry) => avgStat(filtered, key);
-      result[p.athlete_id] = {
-        ppg: avg('points'),
-        rpg: avg('rebounds'),
-        apg: avg('assists'),
-        spg: avg('steals'),
-        bpg: avg('blocks'),
-      };
-    }
-    return result;
-  }, [activeAwayPlayers, activeHomePlayers, game.gameDate]);
+  const pointInTimeStatsByPlayerId = useMemo(
+    () => buildPropStatPitByPlayerId([...activeAwayPlayers, ...activeHomePlayers], game.gameDate ?? null),
+    [activeAwayPlayers, activeHomePlayers, game.gameDate]
+  );
 
   const topPlayersByStat = useMemo(
     () =>
       [...activeAwayPlayers, ...activeHomePlayers]
         .sort((a, b) => {
-          const aVal = pointInTimeStatsByPlayerId[a.athlete_id]?.[keyMatchupStat] ?? getPlayerStatValue(a, keyMatchupStat);
-          const bVal = pointInTimeStatsByPlayerId[b.athlete_id]?.[keyMatchupStat] ?? getPlayerStatValue(b, keyMatchupStat);
+          const aVal = pointInTimeStatsByPlayerId[a.athlete_id]?.[keyMatchupStat] ?? 0;
+          const bVal = pointInTimeStatsByPlayerId[b.athlete_id]?.[keyMatchupStat] ?? 0;
           return bVal - aVal;
         })
         .slice(0, 6),
@@ -816,7 +909,7 @@ export function GameMatchupView({
     const pit: MatchupPointInTimeStats = {};
     for (const p of [...activeAwayPlayers, ...activeHomePlayers]) {
       const s = pointInTimeStatsByPlayerId[p.athlete_id];
-      if (s) pit[p.athlete_id] = { ppg: s.ppg, apg: s.apg };
+      if (s) pit[p.athlete_id] = { ppg: s.points, apg: s.assists };
     }
     return computePlayerMatchupInsights(game, players, activeAwayIds, activeHomeIds, {
       excludeAthleteIds: injuredOutAthleteIds,
@@ -856,7 +949,7 @@ export function GameMatchupView({
       keyboardShouldPersistTaps="handled"
       scrollEventThrottle={16}>
 
-      <View style={styles.sectionOpen}>
+      <View>
         <GameMatchupDisplay game={game} colorScheme={colorScheme ?? 'light'} />
       </View>
 
@@ -891,6 +984,22 @@ export function GameMatchupView({
               bgColor={colors.background}
               secondaryText={colors.secondaryText}
             />
+            {sidelinedStatLeaderLines.length > 0
+              ? sidelinedStatLeaderLines.map((line) => (
+                  <View key={`${line.teamAbbrev}-${line.player.athlete_id}`} style={styles.sidelinedStatLeaderRow}>
+                    <Text style={styles.sidelinedStatLeaderEmoji} accessibilityLabel="Alert">
+                      ⚠️
+                    </Text>
+                    <ThemedText style={[styles.sidelinedStatLeaderBody, { color: colors.secondaryText }]}>
+                      {formatSidelinedLeaderBody(
+                        line.teamAbbrev,
+                        line.player.athlete_display_name,
+                        line.stats
+                      )}
+                    </ThemedText>
+                  </View>
+                ))
+              : null}
             {liveDataAsOfLabel ? (
               <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
                 Injury report and live data as of {liveDataAsOfLabel}
@@ -908,6 +1017,94 @@ export function GameMatchupView({
         </View>
       ) : null}
 
+      <View style={styles.sectionOpen}>
+        <ThemedText style={styles.sectionTitle}>Season Leaders</ThemedText>
+        <View style={styles.breakdownFilterRow}>
+          <FilterOptionButtons
+            options={PROP_STAT_OPTIONS}
+            value={keyMatchupStat}
+            onSelect={(k) => setKeyMatchupStat(k as PropStatKey)}
+            colorScheme={colorScheme ?? 'light'}
+            scrollable
+          />
+        </View>
+        {playerMatchupInsights.length > 0 && (
+          <InsightCarousel
+            insights={playerMatchupInsights}
+            style={styles.insightCarousel}
+            cycleDurationMs={5000}
+          />
+        )}
+        <View style={styles.matchupGrid}>
+          {topPlayersByStat.map((p) => {
+            const isAway =
+              toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase()) === displayAwayAbbrev;
+            const opp = isAway ? displayHomeAbbrev : displayAwayAbbrev;
+            const pitStats = pointInTimeStatsByPlayerId[p.athlete_id];
+            const fullLog = (p.game_log ?? []) as GameLogEntry[];
+            const pitLog = game.gameDate
+              ? fullLog.filter((g) => (g.game_date ?? '') < game.gameDate!)
+              : fullLog;
+            const gamesVs = getGamesVsOpponent(pitLog, opp);
+            const vsLine = (() => {
+              if (gamesVs.length === 0) return null;
+              if (gamesVs.length === 1) {
+                const raw = getStatFromGameLog(gamesVs[0], keyMatchupStat);
+                return `Got ${formatVsOpponentSingleGameValue(raw)} ${propStatShortLabel(keyMatchupStat)} vs ${opp} last time`;
+              }
+              return `Average of ${getSeasonAvgFromGameLog(gamesVs, keyMatchupStat).toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]} in ${gamesVs.length} games vs ${opp}`;
+            })();
+            return (
+              <View key={p.athlete_id} style={styles.matchupRow}>
+                <Pressable
+                  style={styles.playerRow}
+                  onPress={() => router.push({ pathname: '/player/[id]', params: { id: p.athlete_id, name: p.athlete_display_name, from: 'Game' } })}>
+                  <PlayerAvatar uri={p.athlete_headshot_href} size={44} />
+                  <View style={styles.playerMeta}>
+                    <ThemedText style={styles.playerName}>
+                      {p.athlete_display_name}
+                      <ThemedText style={[styles.playerTeamAbbrev, { color: colors.secondaryText }]}>
+                        {' '}({toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase())})
+                      </ThemedText>
+                    </ThemedText>
+                    <ThemedText style={[styles.playerStat, { color: colors.secondaryText }]}>
+                      {(() => {
+                        const fmt = (v: number) => v.toFixed(1);
+                        const primary = `${fmt(pitStats?.[keyMatchupStat] ?? getPlayerSeasonAvgFromTotals(p, keyMatchupStat))} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
+                        const others = otherPropStatKeysForRow(keyMatchupStat);
+                        const rest = others
+                          .map(
+                            (s) =>
+                              `${fmt(pitStats?.[s] ?? getPlayerSeasonAvgFromTotals(p, s))} ${PROP_STAT_PLAYER_ROW_LABEL[s]}`
+                          )
+                          .join(' • ');
+                        return rest ? `${primary} • ${rest}` : primary;
+                      })()}
+                    </ThemedText>
+                    {vsLine && (
+                      <ThemedText style={[styles.vsLine, { color: colors.tint }]}>
+                        {vsLine}
+                      </ThemedText>
+                    )}
+                  </View>
+                </Pressable>
+                {/* <View style={styles.similarSection}>
+                  <TouchableOpacity
+                    style={[styles.seeSimilarBtn, { borderColor: colors.tint }]}
+                    onPress={() => openSimilarModal(p)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                    <ThemedText style={[styles.seeSimilarText, { color: colors.tint }]}>
+                      See similar players
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View> */}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
       {/* Mismatch alerts temporarily disabled
       {mismatchAlerts.length > 0 && (
         <View style={[styles.sectionOpen, { backgroundColor: colors.tint + '20' }]}>
@@ -923,9 +1120,201 @@ export function GameMatchupView({
       )}
       */}
 
+      {previousMatchups.length > 0 && (
+        <View style={styles.sectionOpen}>
+          <ThemedText style={styles.sectionTitle}>Previous Matchups</ThemedText>
+          {seasonSeriesSummaryText ? (
+            <ThemedText style={[styles.seriesLine, { color: colors.secondaryText }]}>
+              {seasonSeriesSummaryText}
+            </ThemedText>
+          ) : null}
+          {previousMatchups.length > 1 && (
+            <View style={styles.breakdownFilterRow}>
+              <FilterOptionButtons
+                options={previousMatchups.map((g, i) => ({
+                  key: String(i),
+                  label: formatDate(g.gameDate),
+                }))}
+                value={String(previousMatchupIndex)}
+                onSelect={(k) => setPreviousMatchupIndex(Number(k))}
+                colorScheme={colorScheme ?? 'light'}
+                scrollable
+              />
+            </View>
+          )}
+          {selectedPreviousGame && (
+            <>
+              {previousMatchups.length === 1 && (
+                <View
+                  style={[
+                    styles.previousMatchupDateChip,
+                    {
+                      backgroundColor: colors.cardBackground,
+                      borderColor: colors.tint,
+                    },
+                  ]}>
+                  <ThemedText style={[styles.previousMatchupDateChipText, { color: colors.tint }]}>
+                    {formatDate(selectedPreviousGame.gameDate)}
+                  </ThemedText>
+                </View>
+              )}
+              {previousScoreDisplay && (
+                <>
+                  <View style={styles.previousScoreRow}>
+                    <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
+                      {previousScoreDisplay.leftWon || previousScoreDisplay.isTie ? (
+                        <ThemedText
+                          style={[styles.previousScoreText, previousScoreDisplay.leftWon && { color: '#24d169' }]}
+                          numberOfLines={1}>
+                          {previousScoreDisplay.leftScore}
+                        </ThemedText>
+                      ) : (
+                        <View style={styles.previousScoreOutlineWrap}>
+                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
+                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
+                              {previousScoreDisplay.leftScore}
+                            </Text>
+                          ))}
+                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
+                            {previousScoreDisplay.leftScore}
+                          </ThemedText>
+                        </View>
+                      )}
+                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Away</ThemedText>
+                      <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
+                        {displayAwayAbbrev}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+                    <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
+                      {previousScoreDisplay.rightWon || previousScoreDisplay.isTie ? (
+                        <ThemedText
+                          style={[styles.previousScoreText, previousScoreDisplay.rightWon && { color: '#24d169' }]}
+                          numberOfLines={1}>
+                          {previousScoreDisplay.rightScore}
+                        </ThemedText>
+                      ) : (
+                        <View style={styles.previousScoreOutlineWrap}>
+                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
+                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
+                              {previousScoreDisplay.rightScore}
+                            </Text>
+                          ))}
+                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
+                            {previousScoreDisplay.rightScore}
+                          </ThemedText>
+                        </View>
+                      )}
+                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Home</ThemedText>
+                      <ThemedText style={[styles.teamAbbrev, styles.previousScoreTeamName, { color: '#ffffff' }]}>
+                        {displayHomeAbbrev}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <Pressable
+                    style={[styles.expandPreviousRow, { borderColor: colors.border }]}
+                    onPress={() => setPreviousMatchupExpanded((e) => !e)}
+                    hitSlop={8}>
+                    <ThemedText style={[styles.expandPreviousText, { color: colors.tint }]}>
+                      {previousMatchupExpanded ? 'Hide game stats' : 'Show game stats'}
+                    </ThemedText>
+                    <Feather
+                      name={previousMatchupExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color={colors.tint}
+                    />
+                  </Pressable>
+                </>
+              )}
+              {previousMatchupExpanded && previousScoreDisplay ? (
+                previousBoxScoresLoading ? (
+                  <View style={styles.loadingPlaceholder}>
+                    <ActivityIndicator size="small" color={colors.tint} />
+                    <ThemedText style={[styles.breakdownLoadingText, { color: colors.secondaryText }]}>
+                      Loading game stats…
+                    </ThemedText>
+                  </View>
+                ) : previousMatchupStats ? (
+                  <>
+                  <TeamComparisonBar
+                    label="Assists"
+                    leftValue={previousMatchupStats.away.apg}
+                    rightValue={previousMatchupStats.home.apg}
+                    leftLabel={String(Math.round(previousMatchupStats.away.apg))}
+                    rightLabel={String(Math.round(previousMatchupStats.home.apg))}
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Rebounds"
+                    leftValue={previousMatchupStats.away.rpg}
+                    rightValue={previousMatchupStats.home.rpg}
+                    leftLabel={String(Math.round(previousMatchupStats.away.rpg))}
+                    rightLabel={String(Math.round(previousMatchupStats.home.rpg))}
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Steals"
+                    leftValue={previousMatchupStats.away.spg}
+                    rightValue={previousMatchupStats.home.spg}
+                    leftLabel={String(Math.round(previousMatchupStats.away.spg))}
+                    rightLabel={String(Math.round(previousMatchupStats.home.spg))}
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Blocks"
+                    leftValue={previousMatchupStats.away.bpg}
+                    rightValue={previousMatchupStats.home.bpg}
+                    leftLabel={String(Math.round(previousMatchupStats.away.bpg))}
+                    rightLabel={String(Math.round(previousMatchupStats.home.bpg))}
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Turnovers"
+                    leftValue={previousMatchupStats.away.tpg}
+                    rightValue={previousMatchupStats.home.tpg}
+                    leftLabel={String(Math.round(previousMatchupStats.away.tpg))}
+                    rightLabel={String(Math.round(previousMatchupStats.home.tpg))}
+                    lowerIsBetter
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Field Goal %"
+                    leftValue={previousMatchupStats.away.fgPct}
+                    rightValue={previousMatchupStats.home.fgPct}
+                    leftLabel={`${previousMatchupStats.away.fgPct.toFixed(1)}%`}
+                    rightLabel={`${previousMatchupStats.home.fgPct.toFixed(1)}%`}
+                    isPercent
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="3PT%"
+                    leftValue={previousMatchupStats.away.threePtPct}
+                    rightValue={previousMatchupStats.home.threePtPct}
+                    leftLabel={`${previousMatchupStats.away.threePtPct.toFixed(1)}%`}
+                    rightLabel={`${previousMatchupStats.home.threePtPct.toFixed(1)}%`}
+                    isPercent
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  <TeamComparisonBar
+                    label="Free Throw %"
+                    leftValue={previousMatchupStats.away.ftPct}
+                    rightValue={previousMatchupStats.home.ftPct}
+                    leftLabel={`${previousMatchupStats.away.ftPct.toFixed(1)}%`}
+                    rightLabel={`${previousMatchupStats.home.ftPct.toFixed(1)}%`}
+                    isPercent
+                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
+                  />
+                  </>
+                ) : null
+              ) : null}
+            </>
+          )}
+        </View>
+      )}
+
       {(breakdownStats || breakdownDefenseStats || breakdownLoading || teamDefenseLoading || breakdownUnavailable || breakdownDefenseUnavailable) && (
         <View style={styles.sectionOpen}>
-          <ThemedText style={styles.sectionTitle}>Seasonal Breakdown</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Season Breakdown</ThemedText>
           <View style={[styles.breakdownFilterRow, styles.breakdownFilterRowFirst]}>
             <FilterOptionButtons
               options={[
@@ -1208,269 +1597,6 @@ export function GameMatchupView({
         </View>
       )}
 
-      {previousMatchups.length > 0 && (
-        <View style={styles.sectionOpen}>
-          <ThemedText style={styles.sectionTitle}>Previous Matchups</ThemedText>
-          {seasonSeriesSummaryText ? (
-            <ThemedText style={[styles.seriesLine, { color: colors.secondaryText }]}>
-              {seasonSeriesSummaryText}
-            </ThemedText>
-          ) : null}
-          {previousMatchups.length > 1 && (
-            <View style={styles.breakdownFilterRow}>
-              <FilterOptionButtons
-                options={previousMatchups.map((g, i) => ({
-                  key: String(i),
-                  label: formatDate(g.gameDate),
-                }))}
-                value={String(previousMatchupIndex)}
-                onSelect={(k) => setPreviousMatchupIndex(Number(k))}
-                colorScheme={colorScheme ?? 'light'}
-                scrollable
-              />
-            </View>
-          )}
-          {selectedPreviousGame && (
-            <>
-              {previousMatchups.length === 1 && (
-                <ThemedText style={[styles.venue, { color: colors.secondaryText, marginBottom: 8 }]}>
-                  {formatDate(selectedPreviousGame.gameDate)}
-                </ThemedText>
-              )}
-              {previousScoreDisplay && (
-                <>
-                  <View style={styles.previousScoreRow}>
-                    <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-                      {previousScoreDisplay.leftWon || previousScoreDisplay.isTie ? (
-                        <ThemedText
-                          style={[styles.previousScoreText, previousScoreDisplay.leftWon && { color: '#24d169' }]}
-                          numberOfLines={1}>
-                          {previousScoreDisplay.leftScore}
-                        </ThemedText>
-                      ) : (
-                        <View style={styles.previousScoreOutlineWrap}>
-                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
-                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                              {previousScoreDisplay.leftScore}
-                            </Text>
-                          ))}
-                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                            {previousScoreDisplay.leftScore}
-                          </ThemedText>
-                        </View>
-                      )}
-                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Away</ThemedText>
-                      <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
-                        {displayAwayAbbrev}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
-                    <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-                      {previousScoreDisplay.rightWon || previousScoreDisplay.isTie ? (
-                        <ThemedText
-                          style={[styles.previousScoreText, previousScoreDisplay.rightWon && { color: '#24d169' }]}
-                          numberOfLines={1}>
-                          {previousScoreDisplay.rightScore}
-                        </ThemedText>
-                      ) : (
-                        <View style={styles.previousScoreOutlineWrap}>
-                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
-                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                              {previousScoreDisplay.rightScore}
-                            </Text>
-                          ))}
-                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                            {previousScoreDisplay.rightScore}
-                          </ThemedText>
-                        </View>
-                      )}
-                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Home</ThemedText>
-                      <ThemedText style={[styles.teamAbbrev, styles.previousScoreTeamName, { color: '#ffffff' }]}>
-                        {displayHomeAbbrev}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <Pressable
-                    style={styles.expandPreviousRow}
-                    onPress={() => setPreviousMatchupExpanded((e) => !e)}
-                    hitSlop={8}>
-                    <ThemedText style={[styles.expandPreviousText, { color: colors.tint }]}>
-                      {previousMatchupExpanded ? 'Hide game stats' : 'Show game stats'}
-                    </ThemedText>
-                    <Feather
-                      name={previousMatchupExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={18}
-                      color={colors.tint}
-                    />
-                  </Pressable>
-                </>
-              )}
-              {previousMatchupExpanded && previousScoreDisplay ? (
-                previousBoxScoresLoading ? (
-                  <View style={styles.loadingPlaceholder}>
-                    <ActivityIndicator size="small" color={colors.tint} />
-                    <ThemedText style={[styles.breakdownLoadingText, { color: colors.secondaryText }]}>
-                      Loading game stats…
-                    </ThemedText>
-                  </View>
-                ) : previousMatchupStats ? (
-                  <>
-                  <TeamComparisonBar
-                    label="Assists"
-                    leftValue={previousMatchupStats.away.apg}
-                    rightValue={previousMatchupStats.home.apg}
-                    leftLabel={String(Math.round(previousMatchupStats.away.apg))}
-                    rightLabel={String(Math.round(previousMatchupStats.home.apg))}
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Rebounds"
-                    leftValue={previousMatchupStats.away.rpg}
-                    rightValue={previousMatchupStats.home.rpg}
-                    leftLabel={String(Math.round(previousMatchupStats.away.rpg))}
-                    rightLabel={String(Math.round(previousMatchupStats.home.rpg))}
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Steals"
-                    leftValue={previousMatchupStats.away.spg}
-                    rightValue={previousMatchupStats.home.spg}
-                    leftLabel={String(Math.round(previousMatchupStats.away.spg))}
-                    rightLabel={String(Math.round(previousMatchupStats.home.spg))}
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Blocks"
-                    leftValue={previousMatchupStats.away.bpg}
-                    rightValue={previousMatchupStats.home.bpg}
-                    leftLabel={String(Math.round(previousMatchupStats.away.bpg))}
-                    rightLabel={String(Math.round(previousMatchupStats.home.bpg))}
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Turnovers"
-                    leftValue={previousMatchupStats.away.tpg}
-                    rightValue={previousMatchupStats.home.tpg}
-                    leftLabel={String(Math.round(previousMatchupStats.away.tpg))}
-                    rightLabel={String(Math.round(previousMatchupStats.home.tpg))}
-                    lowerIsBetter
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Field Goal %"
-                    leftValue={previousMatchupStats.away.fgPct}
-                    rightValue={previousMatchupStats.home.fgPct}
-                    leftLabel={`${previousMatchupStats.away.fgPct.toFixed(1)}%`}
-                    rightLabel={`${previousMatchupStats.home.fgPct.toFixed(1)}%`}
-                    isPercent
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="3PT%"
-                    leftValue={previousMatchupStats.away.threePtPct}
-                    rightValue={previousMatchupStats.home.threePtPct}
-                    leftLabel={`${previousMatchupStats.away.threePtPct.toFixed(1)}%`}
-                    rightLabel={`${previousMatchupStats.home.threePtPct.toFixed(1)}%`}
-                    isPercent
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  <TeamComparisonBar
-                    label="Free Throw %"
-                    leftValue={previousMatchupStats.away.ftPct}
-                    rightValue={previousMatchupStats.home.ftPct}
-                    leftLabel={`${previousMatchupStats.away.ftPct.toFixed(1)}%`}
-                    rightLabel={`${previousMatchupStats.home.ftPct.toFixed(1)}%`}
-                    isPercent
-                    {...(previousMatchupTeamColors && { leftColor: previousMatchupTeamColors.awayColor, rightColor: previousMatchupTeamColors.homeColor })}
-                  />
-                  </>
-                ) : null
-              ) : null}
-            </>
-          )}
-        </View>
-      )}
-
-      <View style={styles.sectionOpen}>
-        <ThemedText style={styles.sectionTitle}>Season Leaders</ThemedText>
-        <View style={styles.breakdownFilterRow}>
-          <FilterOptionButtons
-            options={KEY_MATCHUP_STAT_OPTIONS}
-            value={keyMatchupStat}
-            onSelect={(k) => setKeyMatchupStat(k as typeof keyMatchupStat)}
-            colorScheme={colorScheme ?? 'light'}
-            scrollable
-          />
-        </View>
-        {playerMatchupInsights.length > 0 && (
-          <InsightCarousel
-            insights={playerMatchupInsights}
-            style={styles.insightCarousel}
-            cycleDurationMs={5000}
-          />
-        )}
-        <View style={styles.matchupGrid}>
-          {topPlayersByStat.map((p) => {
-            const isAway =
-              toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase()) === displayAwayAbbrev;
-            const opp = isAway ? displayHomeAbbrev : displayAwayAbbrev;
-            const pitStats = pointInTimeStatsByPlayerId[p.athlete_id];
-            const fullLog = (p.game_log ?? []) as GameLogEntry[];
-            const pitLog = game.gameDate
-              ? fullLog.filter((g) => (g.game_date ?? '') < game.gameDate!)
-              : fullLog;
-            const gamesVs = getGamesVsOpponent(pitLog, opp);
-            const logKey = GAME_LOG_STAT_KEY[keyMatchupStat];
-            const vsLine =
-              gamesVs.length > 0
-                ? `vs ${opp}: ${avgStat(gamesVs, logKey).toFixed(1)} ${getStatLabel(keyMatchupStat)} in ${gamesVs.length} games`
-                : null;
-            return (
-              <View key={p.athlete_id} style={styles.matchupRow}>
-                <Pressable
-                  style={styles.playerRow}
-                  onPress={() => router.push(`/player/${p.athlete_id}`)}>
-                  <PlayerAvatar uri={p.athlete_headshot_href} size={44} />
-                  <View style={styles.playerMeta}>
-                    <ThemedText style={styles.playerName}>
-                      {p.athlete_display_name}
-                      <ThemedText style={[styles.playerTeamAbbrev, { color: colors.secondaryText }]}>
-                        {' '}({toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase())})
-                      </ThemedText>
-                    </ThemedText>
-                    <ThemedText style={[styles.playerStat, { color: colors.secondaryText }]}>
-                      {(() => {
-                        const fmt = (v: number) => v.toFixed(1);
-                        const primary = `${fmt(pitStats?.[keyMatchupStat] ?? getPlayerStatValue(p, keyMatchupStat))} ${getStatLabel(keyMatchupStat)}`;
-                        const others = (['ppg', 'rpg', 'apg'] as const).filter((s) => s !== keyMatchupStat);
-                        const rest = others.map((s) => `${fmt(pitStats?.[s] ?? getPlayerStatValue(p, s))} ${getStatLabel(s)}`).join(' • ');
-                        return rest ? `${primary} • ${rest}` : primary;
-                      })()}
-                    </ThemedText>
-                    {vsLine && (
-                      <ThemedText style={[styles.vsLine, { color: colors.tint }]}>
-                        {vsLine}
-                      </ThemedText>
-                    )}
-                  </View>
-                </Pressable>
-                {/* <View style={styles.similarSection}>
-                  <TouchableOpacity
-                    style={[styles.seeSimilarBtn, { borderColor: colors.tint }]}
-                    onPress={() => openSimilarModal(p)}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                    <ThemedText style={[styles.seeSimilarText, { color: colors.tint }]}>
-                      See similar players
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View> */}
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
       {game.completed && boxScores.length > 0 && (
         <View style={[styles.sectionOpen, { backgroundColor: colors.cardBackground }]}>
           <ThemedText style={styles.sectionTitle}>Top Performers</ThemedText>
@@ -1544,6 +1670,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingVertical: 40,
+    paddingHorizontal: 16,
   },
   venue: {
     fontSize: 14,
@@ -1602,20 +1729,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   sectionOpen: {
-    marginHorizontal: 12,
-    // marginBottom: 20,
-    // paddingTop: 12,
-    // paddingBottom: 4,
-    // borderTopWidth: 1,
-    // borderTopColor: 'rgba(37, 37, 37, 0.5)',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(37, 37, 37, 0.95)',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(37, 37, 37, 0.5)',
   },
   seriesLine: {
     fontSize: 14,
-    marginTop: 10,
+    marginVertical: 16,
     textAlign: 'center',
   },
   dataFreshness: {
@@ -1623,12 +1744,39 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
+  sidelinedStatLeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 10,
+    gap: 12,
+    // borderWidth: 1,
+    // borderColor: 'red',
+  },
+  sidelinedStatLeaderEmoji: {
+    fontSize: 12,
+    lineHeight: 18,
+    backgroundColor: '#e5393550',
+    borderRadius: 100,
+    padding: 8
+  },
+  sidelinedStatLeaderBody: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 20,
+    textAlign: 'left',
+  },
   expandPreviousRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 25,
+    width: 200,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   expandPreviousText: {
     fontSize: 14,
@@ -1641,6 +1789,17 @@ const styles = StyleSheet.create({
   },
   breakdownFilterRow: {
     marginBottom: 12,
+  },
+  previousMatchupDateChip: {
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  previousMatchupDateChipText: {
+    fontSize: 14,
   },
   breakdownFilterRowFirst: {
     paddingLeft: 24,

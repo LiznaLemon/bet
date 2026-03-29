@@ -4,7 +4,7 @@ import type { TeamDefensiveStats } from '@/lib/queries/team-defensive-stats';
 import type { TeamOffensiveStats } from '@/lib/queries/team-offensive-stats';
 import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 
-function teamMatches(teamAbbrev: string, gameAbbrev: string): boolean {
+export function teamMatches(teamAbbrev: string, gameAbbrev: string): boolean {
   const aliases = getAbbrevAliases(gameAbbrev.toUpperCase().trim());
   return aliases.includes((teamAbbrev ?? '').toUpperCase().trim());
 }

@@ -80,7 +80,7 @@ function PlayerCardComponent({
           styles.playerCard,
           { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
-        onPress={() => router.push(`/player/${player.athlete_id}`)}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <View style={styles.playerInfo}>
           <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
           <View style={styles.playerDetails}>
@@ -119,7 +119,7 @@ function PlayerCardComponent({
           styles.playerCardCompact,
           { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
-        onPress={() => router.push(`/player/${player.athlete_id}`)}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <PlayerAvatar uri={player.athlete_headshot_href} size={40} />
         <View style={styles.compactInfo}>
           <View style={styles.nameRow}>
@@ -150,7 +150,7 @@ function PlayerCardComponent({
           styles.playerCardDetailed,
           { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
-        onPress={() => router.push(`/player/${player.athlete_id}`)}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <View style={styles.detailedHeader}>
           <PlayerAvatar uri={player.athlete_headshot_href} size={60} />
           <View style={styles.detailedInfo}>
@@ -200,7 +200,7 @@ function PlayerCardComponent({
           { borderBottomColor: Colors[colorScheme].border },
           // { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
-        onPress={() => router.push(`/player/${player.athlete_id}`)}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <View style={styles.playerInfo}>
           <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
           <View style={styles.playerDetails}>
@@ -230,7 +230,7 @@ function PlayerCardComponent({
           styles.playerCardLong,
           !qualified && { opacity: 0.45 },
         ]}
-        onPress={() => router.push(`/player/${player.athlete_id}`)}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         {/* Player Image */}
         <View style={styles.longHeaderColumn}>
           <PlayerAvatar uri={player.athlete_headshot_href} size={48} style={styles.playerImageLong} />

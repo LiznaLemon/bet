@@ -14,10 +14,11 @@ import {
   type TimePeriod,
 } from '@/constants/player-stats-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DimensionValue } from 'react-native';
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -744,8 +745,11 @@ function StatsOverlay({ opacity }: { opacity: SharedValue<number> }) {
 }
 
 export default function PlayerDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name, from } = useLocalSearchParams<{ id: string; name?: string; from?: string }>();
   const colorScheme = useColorScheme();
+  const tintColor = Colors[colorScheme ?? 'light'].tint;
+  const backLabel = from || 'Players';
+  const headerHeight = useHeaderHeight();
   const { data: playersData = [], isLoading: playersLoading } = usePlayers();
   const { data: scheduleData = [] } = useSchedule();
   const { data: fetchedShots = [], isLoading: shotsLoading } = useShots(id, 2026);
@@ -811,19 +815,31 @@ export default function PlayerDetailScreen() {
     [player]
   );
 
+  const headerLeft = useCallback(() => (
+    <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginLeft: 8, paddingHorizontal: 8 }}>
+      <Text style={{ color: tintColor, fontSize: 14 }}>‹ {backLabel}</Text>
+    </Pressable>
+  ), [tintColor, backLabel]);
+
   if (playersLoading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Loading player...</ThemedText>
-      </ThemedView>
+      <>
+        <Stack.Screen options={{ title: name ?? '', headerLeft }} />
+        <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
+          <ThemedText>Loading player...</ThemedText>
+        </ThemedView>
+      </>
     );
   }
 
   if (!player) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Player not found</ThemedText>
-      </ThemedView>
+      <>
+        <Stack.Screen options={{ title: name ?? 'Player', headerLeft }} />
+        <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
+          <ThemedText>Player not found</ThemedText>
+        </ThemedView>
+      </>
     );
   }
 
@@ -856,14 +872,12 @@ export default function PlayerDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: player.athlete_display_name,
-          headerShown: true,
-        }}
-      />
+      <Stack.Screen options={{ title: player.athlete_display_name, headerLeft }} />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: headerHeight }}
+      >
         {/* Player Header */}
         {/* <View style={[styles.header, { backgroundColor: teamColor }]}>
           <Image

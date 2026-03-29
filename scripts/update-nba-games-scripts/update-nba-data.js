@@ -1,12 +1,17 @@
 #!/usr/bin/env node
+/**
+ * NBA Data Update Script
+ * Fetches play-by-play, player boxscores, and team boxscores from ESPN API
+ * and upserts into Supabase.
+ *
+ * Usage:
+ *   node update-nba-data.js [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--dry-run]
+ */
 
 import 'dotenv/config';
-import { mkdirSync } from 'fs';
-import { join } from 'path';
 import { fetchScoreboard, fetchGameSummary } from './espn-api.js';
-import { parsePlayByPlay, parsePlayerBox, parseTeamBox } from './parsers.js';
-import { writeToCsv } from './csv-writer.js';
-import { getSupabaseClient, getTableUpdateWatermarks, upsertGameData } from './supabase-client.js';
+import { parsePlayByPlay, parsePlayerBox, parseScheduleFromSummary, parseTeamBox } from './parsers.js';
+import { getSupabaseClient, getTableUpdateWatermarks, updateSchedule, upsertGameData } from './supabase-client.js';
 
 function todayISO() {
   const t = new Date();
@@ -47,10 +52,7 @@ function parseArgs(argv) {
   const out = {
     from: null,
     to: null,
-    csv: false,
     dryRun: false,
-    skipDbWithCsv: true,
-    outputDir: './output',
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -62,20 +64,8 @@ function parseArgs(argv) {
       out.to = argv[++i];
       continue;
     }
-    if (a === '--csv') {
-      out.csv = true;
-      continue;
-    }
-    if (a === '--no-skip-db') {
-      out.skipDbWithCsv = false;
-      continue;
-    }
     if (a === '--dry-run') {
       out.dryRun = true;
-      continue;
-    }
-    if (a === '--output-dir' && argv[i + 1]) {
-      out.outputDir = argv[++i];
       continue;
     }
   }
@@ -87,19 +77,12 @@ function sleep(ms) {
 }
 
 /** Final games only: ESPN summary has reliable box scores and (when available) PBP. */
-async function processFinalGame(gameId, { supabase, willWriteDb, willWriteCsv, outputDir }) {
+async function processFinalGame(gameId, { supabase, willWriteDb }) {
   const summary = await fetchGameSummary(gameId);
   const pbpRows = parsePlayByPlay(summary);
   const teamRows = parseTeamBox(summary);
   const playerRows = parsePlayerBox(summary);
-
-  if (willWriteCsv) {
-    mkdirSync(outputDir, { recursive: true });
-    const base = join(outputDir, String(gameId));
-    if (pbpRows?.length) writeToCsv(pbpRows, `${base}_play_by_play_raw.csv`);
-    if (teamRows?.length) writeToCsv(teamRows, `${base}_team_boxscores_raw.csv`);
-    if (playerRows?.length) writeToCsv(playerRows, `${base}_player_boxscores_raw.csv`);
-  }
+  const schedule = parseScheduleFromSummary(summary);
 
   if (willWriteDb && supabase) {
     if (pbpRows?.length) {
@@ -111,13 +94,15 @@ async function processFinalGame(gameId, { supabase, willWriteDb, willWriteCsv, o
     if (playerRows?.length) {
       await upsertGameData(supabase, 'player_boxscores_raw', 'game_id', gameId, playerRows);
     }
+    if (schedule) {
+      await updateSchedule(supabase, gameId, schedule);
+    }
   }
 }
 
 async function main() {
   const args = parseArgs(process.argv);
-  const willWriteCsv = args.csv;
-  const willWriteDb = !args.dryRun && (!willWriteCsv || !args.skipDbWithCsv);
+  const willWriteDb = !args.dryRun;
 
   const supabase = getSupabaseClient();
   if (willWriteDb && !supabase) {
@@ -138,7 +123,6 @@ async function main() {
     if (watermarks) {
       const present = Object.entries(watermarks).filter(([, ts]) => !!ts);
       if (present.length > 0) {
-        // Re-sync from the oldest table watermark date so lagging tables catch up.
         const oldest = present.sort((a, b) => String(a[1]).localeCompare(String(b[1])))[0];
         fromDate = isoDateFromTimestamp(oldest[1]);
         console.log(`ℹ️ Using oldest table watermark: ${oldest[0]} @ ${oldest[1]}`);
@@ -153,8 +137,10 @@ async function main() {
   }
 
   console.log(`🚀 NBA box scores & PBP ${fromDate} → ${toDate}`);
-  if (args.dryRun) console.log('   (dry-run: no DB or CSV writes)');
-  if (willWriteCsv) console.log(`   CSV output: ${args.outputDir}`);
+  if (args.dryRun) console.log('   (dry-run: no DB writes)');
+
+  let totalGames = 0;
+  const failedGames = [];
 
   for (let dateISO = fromDate; dateISO <= toDate; dateISO = addDaysISO(dateISO, 1)) {
     const ymd = dateISO.replace(/-/g, '');
@@ -172,18 +158,26 @@ async function main() {
     for (const ev of events) {
       const gameId = ev.game_id;
       try {
-        console.log(`   ✓ Game ${gameId}`);
+        process.stdout.write(`\rProcessing game ${gameId}... (${totalGames + 1} total)`);
+
         await processFinalGame(gameId, {
           supabase,
           willWriteDb,
-          willWriteCsv,
-          outputDir: args.outputDir,
         });
+
+        totalGames++;
       } catch (e) {
-        console.error(`   ❌ Game ${gameId}:`, e.message);
+        failedGames.push({ gameId, error: e.message });
+        console.error(`\n   ❌ Game ${gameId}:`, e.message);
       }
       await sleep(1000);
     }
+  }
+
+  console.log(`\n✅ Completed. Processed ${totalGames} games.`);
+
+  if (failedGames.length > 0) {
+    console.warn(`⚠️ Failed games: ${failedGames.map((g) => g.gameId).join(', ')}`);
   }
 
   console.log('✨ Done.');

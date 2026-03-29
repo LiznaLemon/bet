@@ -11,8 +11,9 @@ import { usePlayByPlay } from '@/lib/queries/play-by-play';
 import { usePlayersForTeams } from '@/lib/queries/players-for-teams';
 import { useGame } from '@/lib/queries/schedule';
 import type { PlayerProp } from '@/lib/types/props';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect } from '@react-navigation/native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,6 +30,7 @@ export default function GameDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const headerHeight = useHeaderHeight();
 
   const [props, setProps, refreshFromStorage] = usePersistedProps(id ?? undefined);
 
@@ -66,7 +68,7 @@ export default function GameDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Game' }} />
-        <ThemedView style={styles.center}>
+        <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
           <ThemedText>Invalid game</ThemedText>
         </ThemedView>
       </>
@@ -77,7 +79,7 @@ export default function GameDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Game' }} />
-        <ThemedView style={styles.center}>
+        <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
           <ActivityIndicator size="large" color={colors.tint} />
           <ThemedText style={[styles.loadingText, { color: colors.secondaryText }]}>
             Loading game...
@@ -91,7 +93,7 @@ export default function GameDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Game' }} />
-        <ThemedView style={styles.center}>
+        <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
           <ThemedText>Game not found</ThemedText>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <ThemedText style={{ color: colors.tint }}>Go back</ThemedText>
@@ -102,18 +104,17 @@ export default function GameDetailScreen() {
   }
 
   const title = `${game.awayTeamAbbrev} @ ${game.homeTeamAbbrev}`;
-  const liveTabLabel = isLiveESPN ? 'Live' : game.completed ? 'Replay' : 'Sim';
+  const liveTabLabel = isLiveESPN ? 'Live' : game.completed ? 'Replay' : 'Props Simulator';
 
   return (
     <>
       <Stack.Screen options={{ title }} />
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
         {/* Persistent header: tab bar only — score moved to card in content area */}
         <View
           style={[
             styles.header,
             {
-              backgroundColor: colors.background,
               borderBottomColor: colors.border,
               zIndex: 10,
               elevation: 2,

@@ -6,15 +6,24 @@ import { Pressable, Text } from 'react-native';
 export default function GameLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const tintColor = Colors[colorScheme].tint;
+  const textColor = Colors[colorScheme].text;
+
+  const transparentHeader = {
+    headerTransparent: true,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: 'transparent' },
+    headerTitleStyle: { color: textColor },
+    headerTintColor: tintColor,
+  } as const;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen
         name="index"
         options={{
+          ...transparentHeader,
           headerShown: true,
           headerBackTitle: 'Schedule',
-          headerTintColor: tintColor,
           headerLeft: () => (
             <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginLeft: 8, paddingHorizontal: 8 }}>
               <Text style={{ color: tintColor, fontSize: 14 }}>‹ Schedule</Text>
@@ -25,6 +34,7 @@ export default function GameLayout() {
       <Stack.Screen
         name="select-props"
         options={{
+          ...transparentHeader,
           title: 'Select Props',
           headerShown: true,
           presentation: 'card',

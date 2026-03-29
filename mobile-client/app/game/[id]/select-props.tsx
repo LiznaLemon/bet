@@ -8,6 +8,7 @@ import { useGame } from '@/lib/queries/schedule';
 import { usePlayersForTeams } from '@/lib/queries/players-for-teams';
 import type { Player } from '@/lib/types';
 import type { PlayerProp } from '@/lib/types/props';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
@@ -18,6 +19,7 @@ export default function SelectPropsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const headerHeight = useHeaderHeight();
 
   const { data: game, isLoading: gameLoading } = useGame(id, SEASON);
   const { data: playersForTeams = [] } = usePlayersForTeams(
@@ -93,14 +95,14 @@ export default function SelectPropsScreen() {
 
   if (gameLoading && !game) {
     return (
-      <ThemedView style={[styles.center, { backgroundColor: colors.background }]}>
+      <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
         <ActivityIndicator size="large" color={colors.tint} />
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
       <AddPropForm
         players={playersForForm}
         isLoading={!game}

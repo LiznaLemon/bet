@@ -3,6 +3,7 @@ import { GameMatchupView } from '@/components/game-matchup-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GameMatchupSkeleton } from '@/components/ui/game-matchup-skeleton';
+import { UnderlineTabBar } from '@/components/underline-tab-bar';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFadeTransition } from '@/hooks/use-fade-transition';
@@ -12,9 +13,10 @@ import { useStoredInjuries } from '@/lib/queries/game-injury-reports';
 import { useGameBoxScores } from '@/lib/queries/game-boxscores';
 import { usePlayByPlay } from '@/lib/queries/play-by-play';
 import { usePlayersForTeams } from '@/lib/queries/players-for-teams';
-import { usePreviousMatchups, useGame } from '@/lib/queries/schedule';
+import { useGame, usePreviousMatchups, useScheduleForDateRange } from '@/lib/queries/schedule';
 import { useTeamMatchupContext } from '@/lib/queries/team-matchup-context';
 import type { PlayerProp } from '@/lib/types/props';
+import { getPrevDayDateStr } from '@/lib/utils/date';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
@@ -40,6 +42,14 @@ export default function GameDetailScreen() {
   const [props, setProps, refreshFromStorage] = usePersistedProps(id ?? undefined);
 
   const { data: game, isLoading: gameLoading, isError: gameError, refetch: refetchGame } = useGame(id, SEASON);
+  const b2bStartDate = game?.gameDate ? getPrevDayDateStr(game.gameDate) : '';
+  const b2bEndDate = game?.gameDate ?? '';
+  const { data: scheduleForMatchupDisplay = [] } = useScheduleForDateRange(
+    b2bStartDate,
+    b2bEndDate,
+    SEASON,
+    { enabled: !!game?.gameDate && !!b2bStartDate }
+  );
   const { data: players = [], isLoading: playersLoading } = usePlayersForTeams(
     game?.awayTeamAbbrev,
     game?.homeTeamAbbrev,
@@ -118,6 +128,17 @@ export default function GameDetailScreen() {
   const title = game ? `${game.awayTeamAbbrev} @ ${game.homeTeamAbbrev}` : 'Game';
   const liveTabLabel = isLiveESPN ? 'Live' : game?.completed ? 'Replay' : 'Props Simulator';
 
+  const gameTabs = [
+    { key: 'matchup' as const, label: 'Matchup' },
+    {
+      key: 'live' as const,
+      label: liveTabLabel,
+      leading: isLiveESPN ? (
+        <View style={[styles.liveTabDot, { backgroundColor: '#e53935' }]} />
+      ) : undefined,
+    },
+  ] as const;
+
   return (
     <>
       <Stack.Screen options={{ title }} />
@@ -128,43 +149,16 @@ export default function GameDetailScreen() {
             styles.header,
             { borderBottomColor: colors.border, zIndex: 10, elevation: 2 },
           ]}>
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={[
-                styles.tabItem,
-                activeTab === 'matchup' && [styles.tabItemActive, { borderBottomColor: colors.tint }],
-              ]}
-              onPress={() => setActiveTab('matchup')}
-              activeOpacity={0.7}>
-              <ThemedText
-                style={[
-                  styles.tabLabel,
-                  { color: activeTab === 'matchup' ? colors.tint : colors.secondaryText },
-                ]}>
-                Matchup
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tabItem,
-                activeTab === 'live' && [styles.tabItemActive, { borderBottomColor: colors.tint }],
-              ]}
-              onPress={() => setActiveTab('live')}
-              activeOpacity={0.7}>
-              <View style={styles.tabLabelRow}>
-                {isLiveESPN && (
-                  <View style={[styles.liveTabDot, { backgroundColor: '#e53935' }]} />
-                )}
-                <ThemedText
-                  style={[
-                    styles.tabLabel,
-                    { color: activeTab === 'live' ? colors.tint : colors.secondaryText },
-                  ]}>
-                  {liveTabLabel}
-                </ThemedText>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <UnderlineTabBar
+            tabs={gameTabs}
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+            activeColor={colors.tint}
+            inactiveColor={colors.secondaryText}
+            underlineWidthFraction={0.72}
+            maxUnderlineWidth={112}
+            styles={{ tab: { paddingBottom: 0 } }}
+          />
         </View>
 
         {/* Tab content */}
@@ -205,6 +199,7 @@ export default function GameDetailScreen() {
                     game?.completed ? (storedSnapshot?.capturedAt ?? undefined) : undefined
                   }
                   liveDataFetchedAt={game?.completed ? undefined : espnData?.fetchedAt}
+                  scheduleGames={scheduleForMatchupDisplay}
                 />
               </Animated.View>
             )}
@@ -247,28 +242,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
     paddingBottom: 0,
     borderBottomWidth: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-  },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabItemActive: {
-    borderBottomWidth: 2,
-  },
-  tabLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   liveTabDot: {
     width: 7,

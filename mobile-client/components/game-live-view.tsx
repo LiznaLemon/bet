@@ -823,6 +823,15 @@ const STATS_WITH_QUARTER_AVGS = new Set([
   'free_throws_made',
 ]);
 
+function formatLiveStatDelta(d: number): string {
+  if (d === 0) return '';
+  const rounded =
+    Math.abs(d - Math.round(d)) < 1e-6
+      ? Math.round(d)
+      : Math.round(d * 10) / 10;
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+}
+
 function LivePropCard({
   prop,
   player,
@@ -888,6 +897,28 @@ function LivePropCard({
       prop.playerId
     );
   }, [prop, liveStats, filteredGameLog, quarterContext, quarterRows, leagueContext, statsAtQuarterEnds, currentPeriod]);
+
+  const prevLiveCurrentValueRef = useRef<number | null>(null);
+  const [riveChangeInValue, setRiveChangeInValue] = useState('');
+
+  useEffect(() => {
+    if (!isSingleProp(prop) || !liveInsight || prop.stat === 'minutes') {
+      prevLiveCurrentValueRef.current = null;
+      setRiveChangeInValue('');
+      return;
+    }
+    const cur = liveInsight.currentValue;
+    const prev = prevLiveCurrentValueRef.current;
+    if (prev == null) {
+      prevLiveCurrentValueRef.current = cur;
+      return;
+    }
+    if (prev !== cur) {
+      const d = cur - prev;
+      prevLiveCurrentValueRef.current = cur;
+      setRiveChangeInValue(d === 0 ? '' : formatLiveStatDelta(d));
+    }
+  }, [prop, liveInsight]);
 
   const handleRemove = useCallback(() => {
     onRemove(prop.id);
@@ -984,6 +1015,7 @@ function LivePropCard({
               statLabel={STAT_LABELS[prop.stat] ?? prop.stat}
               colorScheme={colorScheme ?? 'light'}
               isGameOver={isGameOver}
+              changeInValue={riveChangeInValue}
             />
           )}
           {prop.stat !== 'minutes' &&

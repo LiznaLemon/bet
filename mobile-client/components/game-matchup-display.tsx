@@ -159,12 +159,21 @@ export function GameMatchupDisplay({
   const isTie = showScores && (game.awayScore ?? 0) === (game.homeScore ?? 0);
   const awayColors = getTeamColors(game.awayTeamAbbrev);
   const homeColors = getTeamColors(game.homeTeamAbbrev);
+  const enrichedGame =
+    scheduleGames?.find((g) => g.id === game.id) ??
+    scheduleGames?.find((g) => g.gameId === game.id);
   const awayB2B =
-    game.awayBackToBack ?? (scheduleGames ? isTeamOnBackToBack(game.awayTeamAbbrev, game.gameDate, scheduleGames) : false);
+    game.awayBackToBack ??
+    enrichedGame?.awayBackToBack ??
+    (scheduleGames ? isTeamOnBackToBack(game.awayTeamAbbrev, game.gameDate, scheduleGames) : false);
   const homeB2B =
-    game.homeBackToBack ?? (scheduleGames ? isTeamOnBackToBack(game.homeTeamAbbrev, game.gameDate, scheduleGames) : false);
-  const awayRecord = game.awayRecord ?? null;
-  const homeRecord = game.homeRecord ?? null;
+    game.homeBackToBack ??
+    enrichedGame?.homeBackToBack ??
+    (scheduleGames ? isTeamOnBackToBack(game.homeTeamAbbrev, game.gameDate, scheduleGames) : false);
+  const awayRecord =
+    formatRecordForDisplay(game.awayRecord) != null ? game.awayRecord : enrichedGame?.awayRecord ?? null;
+  const homeRecord =
+    formatRecordForDisplay(game.homeRecord) != null ? game.homeRecord : enrichedGame?.homeRecord ?? null;
 
   return (
     <>

@@ -185,6 +185,8 @@ type GameMatchupViewProps = {
   liveDataFetchedAt?: string;
   /** ISO timestamp of the stored snapshot; shown for completed historical games. */
   injurySnapshotCapturedAt?: string;
+  /** Enriched schedule slice (e.g. game day ±1) for team records / B2B matching the schedule tab. */
+  scheduleGames?: ScheduleGame[];
 };
 
 // ─── Injury Marquee ──────────────────────────────────────────────────────────
@@ -625,6 +627,7 @@ export function GameMatchupView({
   injuries = [],
   liveDataFetchedAt,
   injurySnapshotCapturedAt,
+  scheduleGames,
 }: GameMatchupViewProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -1317,7 +1320,11 @@ export function GameMatchupView({
       scrollEventThrottle={16}>
 
       <View>
-        <GameMatchupDisplay game={game} colorScheme={colorScheme ?? 'light'} />
+        <GameMatchupDisplay
+          game={game}
+          colorScheme={colorScheme ?? 'light'}
+          scheduleGames={scheduleGames}
+        />
       </View>
 
       <MatchupSummarySection

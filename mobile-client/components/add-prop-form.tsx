@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import {
   computeHitRatesByWindow,
   getPlayerSeasonAvgFromTotals,
@@ -11,20 +12,19 @@ import {
 } from '@/lib/props/compute-prop-stats';
 import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
 import type { GameLogEntry, Player } from '@/lib/types';
-import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import type { CombinedProp, PlayerProp, PropStatKey, SingleProp } from '@/lib/types/props';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

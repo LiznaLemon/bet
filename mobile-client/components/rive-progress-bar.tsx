@@ -18,15 +18,18 @@ export type RiveProgressBarProps = {
   statLabel: string;
   colorScheme: 'light' | 'dark';
   isGameOver?: boolean;
+  /** Shown in Rive when the stat changes, e.g. "+2", "+1" (from parent tracking prior currentValue). */
+  changeInValue?: string;
 };
 
-const RIVE_PROGRESS_BAR_PATH = require('../assets/rive/prop-tracker-progress-bar.riv');
+const RIVE_PROGRESS_BAR_PATH = require('../assets/rive/progress-bar-concept.riv');
 
 export const RiveProgressBar = memo(function RiveProgressBar({
   currentValue,
   line,
   projectedValue,
   averageProjectedValue,
+  changeInValue = '',
 }: RiveProgressBarProps) {
   const { riveFile, isLoading, error } = useRiveFile(RIVE_PROGRESS_BAR_PATH);
   const viewModelInstance = useViewModelInstance(riveFile);
@@ -49,6 +52,9 @@ export const RiveProgressBar = memo(function RiveProgressBar({
       topMarkerProp.value = projectedValue ?? line;
     if (bottomMarkerProp)
       bottomMarkerProp.value = averageProjectedValue ?? line;
+
+    const changeLabelProp = viewModelInstance.stringProperty('changeInValue');
+    if (changeLabelProp) changeLabelProp.value = changeInValue;
 
     // Force the state machine to advance so data binding updates are rendered.
     // State machines can "settle" when idle; playIfNeeded unsettles them.
@@ -75,6 +81,7 @@ export const RiveProgressBar = memo(function RiveProgressBar({
     line,
     projectedValue,
     averageProjectedValue,
+    changeInValue,
     riveViewRef,
   ]);
 

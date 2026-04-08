@@ -20,6 +20,16 @@ export type ScheduleGame = {
   /** True when team played on previous calendar day. */
   homeBackToBack?: boolean;
   awayBackToBack?: boolean;
+  /** Context about yesterday's game for back-to-back teams. */
+  homeB2BContext?: B2BContext;
+  awayB2BContext?: B2BContext;
+};
+
+export type B2BContext = {
+  opponentAbbrev: string;
+  wasHome: boolean;
+  won: boolean;
+  hasResult: boolean;
 };
 
 export type GameLogEntry = {

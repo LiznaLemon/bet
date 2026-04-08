@@ -140,10 +140,13 @@ export function GameMatchupDisplay({
   game,
   colorScheme,
   scheduleGames,
+  liveLabel,
 }: {
   game: ScheduleGame;
   colorScheme: 'light' | 'dark';
   scheduleGames?: ScheduleGame[];
+  /** When set, replaces the date/time label with a live-game indicator. */
+  liveLabel?: string;
 }) {
   const colors = Colors[colorScheme];
   const showScores =
@@ -165,7 +168,14 @@ export function GameMatchupDisplay({
   return (
     <>
       <View style={styles.headerTop}>
-        <ThemedText style={styles.dateLabel}>{formatDateLabel(game)}</ThemedText>
+        {liveLabel ? (
+          <View style={styles.liveLabelRow}>
+            <View style={styles.liveDot} />
+            <ThemedText style={[styles.dateLabel, styles.liveLabelText]}>{liveLabel}</ThemedText>
+          </View>
+        ) : (
+          <ThemedText style={styles.dateLabel}>{formatDateLabel(game)}</ThemedText>
+        )}
       </View>
       {showScores ? (
         <View style={styles.previousScoreRow}>
@@ -255,6 +265,21 @@ export function GameMatchupDisplay({
 const styles = StyleSheet.create({
   headerTop: {
     marginBottom: 8,
+  },
+  liveLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#e53935',
+  },
+  liveLabelText: {
+    color: '#e53935',
   },
   dateLabel: {
     fontSize: 14,

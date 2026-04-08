@@ -153,7 +153,7 @@ function computeTrendInsights(
         // Back-to-back only when we've confirmed they have a game today
         const opponent = teamAbbrev ? getTonightOpponent(teamAbbrev, scheduleGames) : null;
         if (opponent) {
-          insights.push(`Playing a back-to-back game tonight against ${opponent}.`);
+          insights.push(`Playing a back to back game tonight against ${opponent}.`);
         } else {
           insights.push(`1 day of rest since last game on ${lastGameFmt}${againstStr}.`);
         }

@@ -2,10 +2,13 @@ import { GameLiveView } from '@/components/game-live-view';
 import { GameMatchupView } from '@/components/game-matchup-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { GameMatchupSkeleton } from '@/components/ui/game-matchup-skeleton';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFadeTransition } from '@/hooks/use-fade-transition';
 import { usePersistedProps } from '@/hooks/use-persisted-props';
 import { useESPNLiveGame } from '@/lib/queries/espn-live-game';
+import { useStoredInjuries } from '@/lib/queries/game-injury-reports';
 import { useGameBoxScores } from '@/lib/queries/game-boxscores';
 import { usePlayByPlay } from '@/lib/queries/play-by-play';
 import { usePlayersForTeams } from '@/lib/queries/players-for-teams';
@@ -14,11 +17,12 @@ import type { PlayerProp } from '@/lib/types/props';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -34,7 +38,7 @@ export default function GameDetailScreen() {
 
   const [props, setProps, refreshFromStorage] = usePersistedProps(id ?? undefined);
 
-  const { data: game, isLoading: gameLoading } = useGame(id, SEASON);
+  const { data: game, isLoading: gameLoading, isError: gameError, refetch: refetchGame } = useGame(id, SEASON);
   const { data: players = [], isLoading: playersLoading } = usePlayersForTeams(
     game?.awayTeamAbbrev,
     game?.homeTeamAbbrev,
@@ -45,8 +49,21 @@ export default function GameDetailScreen() {
 
   const useESPN = !playsLoading && supabasePlays.length === 0;
   const { data: espnData } = useESPNLiveGame(id, { enabled: !!id && useESPN });
+  const { data: storedSnapshot } = useStoredInjuries(id, game?.completed ?? false);
   /** Only treat as live when game is actually in progress — not scheduled/preview (which also have isFinal: false) */
   const isLiveESPN = useESPN && espnData && espnData.statusName === 'STATUS_IN_PROGRESS';
+
+  /**
+   * ESPN has fresher game times than the DB (which only syncs once daily).
+   * For upcoming games, override gameTime with ESPN's current shortDetail.
+   */
+  const gameWithFreshTime = useMemo(() => {
+    if (!game || game.completed || !espnData?.statusShortDetail) return game;
+    const parts = espnData.statusShortDetail.split(' - ');
+    const espnTime = parts.length > 1 ? parts[1].trim() : null;
+    if (!espnTime || espnTime === game.gameTime) return game;
+    return { ...game, gameTime: espnTime };
+  }, [game, espnData?.statusShortDetail]);
 
   const [activeTab, setActiveTab] = useState<'matchup' | 'live'>('matchup');
 
@@ -64,6 +81,10 @@ export default function GameDetailScreen() {
     }
   }, [game?.completed, isLiveESPN]);
 
+  // Fade in the matchup tab content once the primary data is ready
+  const matchupReady = !gameLoading && !playersLoading && !!game;
+  const matchupOpacity = useFadeTransition(id, matchupReady);
+
   if (!id) {
     return (
       <>
@@ -75,50 +96,18 @@ export default function GameDetailScreen() {
     );
   }
 
-  if (gameLoading && !game) {
-    return (
-      <>
-        <Stack.Screen options={{ title: 'Game' }} />
-        <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <ThemedText style={[styles.loadingText, { color: colors.secondaryText }]}>
-            Loading game...
-          </ThemedText>
-        </ThemedView>
-      </>
-    );
-  }
-
-  if (!game) {
-    return (
-      <>
-        <Stack.Screen options={{ title: 'Game' }} />
-        <ThemedView style={[styles.center, { paddingTop: headerHeight }]}>
-          <ThemedText>Game not found</ThemedText>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <ThemedText style={{ color: colors.tint }}>Go back</ThemedText>
-          </Pressable>
-        </ThemedView>
-      </>
-    );
-  }
-
-  const title = `${game.awayTeamAbbrev} @ ${game.homeTeamAbbrev}`;
-  const liveTabLabel = isLiveESPN ? 'Live' : game.completed ? 'Replay' : 'Props Simulator';
+  const title = game ? `${game.awayTeamAbbrev} @ ${game.homeTeamAbbrev}` : 'Game';
+  const liveTabLabel = isLiveESPN ? 'Live' : game?.completed ? 'Replay' : 'Props Simulator';
 
   return (
     <>
       <Stack.Screen options={{ title }} />
       <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
-        {/* Persistent header: tab bar only — score moved to card in content area */}
+        {/* Tab bar */}
         <View
           style={[
             styles.header,
-            {
-              borderBottomColor: colors.border,
-              zIndex: 10,
-              elevation: 2,
-            },
+            { borderBottomColor: colors.border, zIndex: 10, elevation: 2 },
           ]}>
           <View style={styles.tabBar}>
             <TouchableOpacity
@@ -161,14 +150,47 @@ export default function GameDetailScreen() {
 
         {/* Tab content */}
         {activeTab === 'matchup' ? (
-          <GameMatchupView
-            game={game}
-            players={players}
-            boxScores={boxScores}
-            injuries={espnData?.injuries ?? []}
-            liveDataFetchedAt={espnData?.fetchedAt}
-          />
-        ) : (
+          <View style={styles.tabContent}>
+            {gameError && !game ? (
+              // Hard failure — show retry at full opacity
+              <ScrollView contentContainerStyle={styles.center}>
+                <ThemedText style={[styles.errorText, { color: colors.secondaryText }]}>
+                  Couldn't load game
+                </ThemedText>
+                <Pressable
+                  onPress={() => void refetchGame()}
+                  style={[styles.retryBtn, { borderColor: colors.tint }]}>
+                  <ThemedText style={[styles.retryText, { color: colors.tint }]}>
+                    Tap to retry
+                  </ThemedText>
+                </Pressable>
+              </ScrollView>
+            ) : !matchupReady ? (
+              // Skeleton at full opacity while loading
+              <GameMatchupSkeleton />
+            ) : (
+              // Content fades in when ready
+              <Animated.View style={[styles.tabContent, { opacity: matchupOpacity }]}>
+                <GameMatchupView
+                  game={gameWithFreshTime ?? game!}
+                  players={players}
+                  boxScores={boxScores}
+                  injuries={
+                    game?.completed
+                      ? (storedSnapshot?.injuries.length
+                          ? storedSnapshot.injuries
+                          : (espnData?.injuries ?? []))
+                      : (espnData?.injuries ?? [])
+                  }
+                  injurySnapshotCapturedAt={
+                    game?.completed ? (storedSnapshot?.capturedAt ?? undefined) : undefined
+                  }
+                  liveDataFetchedAt={game?.completed ? undefined : espnData?.fetchedAt}
+                />
+              </Animated.View>
+            )}
+          </View>
+        ) : game ? (
           <GameLiveView
             game={game}
             plays={supabasePlays}
@@ -179,6 +201,8 @@ export default function GameDetailScreen() {
             props={props}
             setProps={setProps as (updater: (prev: PlayerProp[]) => PlayerProp[]) => void}
           />
+        ) : (
+          <GameMatchupSkeleton />
         )}
       </ThemedView>
     </>
@@ -189,42 +213,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  tabContent: {
+    flex: 1,
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-  },
-  backBtn: {
-    marginTop: 12,
+    gap: 16,
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
     paddingBottom: 0,
     borderBottomWidth: 1,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-  },
-  liveBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
   },
   tabBar: {
     flexDirection: 'row',
@@ -252,5 +255,19 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
+  },
+  errorText: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

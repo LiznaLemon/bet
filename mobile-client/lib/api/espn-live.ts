@@ -56,7 +56,7 @@ export type ESPNGameSummary = {
         team?: { abbreviation?: string };
       }>;
       status?: {
-        type?: { name?: string; state?: string };
+        type?: { name?: string; state?: string; shortDetail?: string; detail?: string };
         displayClock?: string;
         period?: number;
         displayPeriod?: string;

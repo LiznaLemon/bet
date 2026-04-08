@@ -1,0 +1,3 @@
+-- Add p_game_date so streaks/active rosters are computed as-of that date.
+-- NULL = no filter (current / upcoming games).
+-- (Full function body committed via Supabase MCP — see applied migration)

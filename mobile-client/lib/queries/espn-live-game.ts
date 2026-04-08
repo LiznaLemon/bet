@@ -5,7 +5,7 @@ import {
   type ESPNGameSummary,
 } from '@/lib/api/espn-live';
 import type { GameBoxScore } from '@/lib/queries/game-boxscores';
-import { upsertGameInjuryReportsFromEspn } from '@/lib/queries/game-injury-reports';
+import { saveInjurySnapshotIfChanged } from '@/lib/queries/game-injury-reports';
 import type { PlayByPlayRecord } from '@/lib/queries/play-by-play';
 import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +36,8 @@ export type ESPNLiveGameResult = {
   awayTeam: string | null;
   homeTeam: string | null;
   injuries: ESPNInjuryEntry[];
+  /** ESPN's current shortDetail for the game status, e.g. "4/7 - 8:00 PM EDT". Fresher than DB. */
+  statusShortDetail: string | null;
   /** ISO timestamp when this payload was fetched from ESPN. */
   fetchedAt: string;
 };
@@ -79,7 +81,7 @@ export function useESPNLiveGame(
       }
 
       const fetchedAt = new Date().toISOString();
-      void upsertGameInjuryReportsFromEspn(gameId!, INJURY_REPORT_SEASON, injuries).catch(() => {});
+      void saveInjurySnapshotIfChanged(gameId!, INJURY_REPORT_SEASON, injuries).catch(() => {});
 
       return {
         plays: mappedPlays,
@@ -93,6 +95,7 @@ export function useESPNLiveGame(
         awayTeam: away?.team?.abbreviation ?? null,
         homeTeam: home?.team?.abbreviation ?? null,
         injuries,
+        statusShortDetail: statusType?.shortDetail ?? statusType?.detail ?? null,
         fetchedAt,
       };
     },

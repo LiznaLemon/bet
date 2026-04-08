@@ -49,10 +49,10 @@ type GameInfo = {
 function getBackToBackInsights(game: GameInfo): string[] {
   const insights: string[] = [];
   if ((game as ScheduleGame).awayBackToBack) {
-    insights.push(`${game.awayTeamAbbrev} is playing back-to-back.`);
+    insights.push(`${game.awayTeamAbbrev} is playing back to back.`);
   }
   if ((game as ScheduleGame).homeBackToBack) {
-    insights.push(`${game.homeTeamAbbrev} is playing back-to-back.`);
+    insights.push(`${game.homeTeamAbbrev} is playing back to back.`);
   }
   return insights;
 }

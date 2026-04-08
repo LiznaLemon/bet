@@ -49,6 +49,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -156,8 +157,10 @@ type GameMatchupViewProps = {
   players: Player[];
   boxScores: GameBoxScore[];
   injuries?: ESPNInjuryEntry[];
-  /** ISO time from ESPN fetch; used for injury/report freshness copy. */
+  /** ISO time from ESPN fetch; used for live/upcoming game freshness copy. */
   liveDataFetchedAt?: string;
+  /** ISO timestamp of the stored snapshot; shown for completed historical games. */
+  injurySnapshotCapturedAt?: string;
 };
 
 // ─── Injury Marquee ──────────────────────────────────────────────────────────
@@ -298,6 +301,291 @@ const marqueeStyles = StyleSheet.create({
   fadeRight: { right: 0 },
 });
 
+// ─── Matchup Summary ─────────────────────────────────────────────────────────
+
+type SummarySpan = {
+  text: string;
+  bold?: boolean;
+  accent?: string;
+};
+
+function buildIntroParts(
+  displayAwayAbbrev: string,
+  displayHomeAbbrev: string,
+  awayRecord: string | null | undefined,
+  homeRecord: string | null | undefined,
+  awayRecentResults: { wins: number; losses: number; results: ('W' | 'L')[] } | undefined,
+  homeRecentResults: { wins: number; losses: number; results: ('W' | 'L')[] } | undefined,
+  awayBackToBack: boolean | undefined,
+  homeBackToBack: boolean | undefined,
+  seasonSeriesSummaryText: string | null,
+  awayB2BContext?: import('@/lib/types').B2BContext,
+  homeB2BContext?: import('@/lib/types').B2BContext
+): SummarySpan[] {
+  const spans: SummarySpan[] = [];
+  const push = (text: string) => spans.push({ text });
+  const pushBold = (text: string, accent?: string) => spans.push({ text, bold: true, accent });
+
+  let sentences = 0;
+
+  const describeRecent = (abbrev: string, record: string | null | undefined, recent: typeof awayRecentResults) => {
+    if (sentences > 0) push(' ');
+    pushBold(abbrev);
+    if (record) { push(' ('); pushBold(record); push(')'); }
+    if (!recent || recent.results.length === 0) { push('.'); sentences++; return; }
+    let streak = 0;
+    const first = recent.results[0];
+    for (const r of recent.results) { if (r !== first) break; streak++; }
+    const wins = recent.results.filter((r) => r === 'W').length;
+    const n = recent.results.length;
+    if (streak >= n) {
+      const kind = first === 'W' ? 'winning' : 'losing';
+      push(' are on a ');
+      pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
+    } else if (streak >= 3) {
+      const kind = first === 'W' ? 'winning' : 'losing';
+      push(' are on a ');
+      pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
+      push(', going ');
+      pushBold(`${wins}-${n - wins}`);
+      push(` over their last ${n}`);
+    } else {
+      push(wins > n / 2 ? ' have won ' : wins < n / 2 ? ' have lost ' : ' split ');
+      pushBold(`${wins} of ${n}`);
+      push(' recent games');
+    }
+    push('.');
+    sentences++;
+  };
+
+  describeRecent(displayAwayAbbrev, awayRecord, awayRecentResults);
+  describeRecent(displayHomeAbbrev, homeRecord, homeRecentResults);
+
+  const b2bEntries: Array<{ abbrev: string; ctx: import('@/lib/types').B2BContext | undefined }> = [
+    ...(awayBackToBack ? [{ abbrev: displayAwayAbbrev, ctx: awayB2BContext }] : []),
+    ...(homeBackToBack ? [{ abbrev: displayHomeAbbrev, ctx: homeB2BContext }] : []),
+  ];
+  for (const { abbrev, ctx } of b2bEntries) {
+    if (sentences > 0) push(' ');
+    pushBold(abbrev);
+    push(' is playing back to back tonight');
+    if (ctx?.hasResult) {
+      const verb = ctx.won ? ' after beating ' : ' after losing to ';
+      const venue = ctx.wasHome ? ' at home' : ' on the road';
+      push(verb);
+      pushBold(ctx.opponentAbbrev);
+      push(venue);
+    }
+    push('.');
+    sentences++;
+  }
+
+  if (seasonSeriesSummaryText) {
+    if (sentences > 0) push(' ');
+    const match = seasonSeriesSummaryText.match(/(\d+)[–\-](\d+)/);
+    if (match) {
+      const idx = seasonSeriesSummaryText.indexOf(match[0]);
+      push(seasonSeriesSummaryText.slice(0, idx));
+      pushBold(match[0]);
+      push(seasonSeriesSummaryText.slice(idx + match[0].length));
+    } else {
+      push(seasonSeriesSummaryText);
+    }
+  }
+
+  return spans;
+}
+
+type SidelinedLine = { teamAbbrev: string; player: Player; stats: Array<{ stat: PropStatKey; value: number }> };
+
+/** Stats shown in the grouped "X are out" inline sentence — excludes free throws, fouls, two-pointers. */
+const SUMMARY_GROUPED_STATS = new Set<PropStatKey>(['points', 'rebounds', 'assists', 'steals', 'blocks', 'three_pt_made']);
+
+function SidelinedGroupedLines({
+  lines,
+  textColor,
+  mutedColor,
+  avatarBgColor,
+}: {
+  lines: SidelinedLine[];
+  textColor: string;
+  mutedColor: string;
+  avatarBgColor: string;
+}) {
+  // Group by team, filtering to relevant stats only
+  const teamGroups: Array<{ teamAbbrev: string; players: Array<{ player: Player; roles: string[] }> }> = [];
+  const teamMap = new Map<string, Map<string, { player: Player; roles: string[] }>>();
+  for (const line of lines) {
+    const roles = line.stats
+      .filter((s) => SUMMARY_GROUPED_STATS.has(s.stat))
+      .map((s) => getLeadRoleNoun(s.stat));
+    if (roles.length === 0) continue;
+    if (!teamMap.has(line.teamAbbrev)) teamMap.set(line.teamAbbrev, new Map());
+    const pm = teamMap.get(line.teamAbbrev)!;
+    if (!pm.has(line.player.athlete_id)) pm.set(line.player.athlete_id, { player: line.player, roles });
+  }
+  for (const [teamAbbrev, pm] of teamMap) {
+    teamGroups.push({ teamAbbrev, players: [...pm.values()] });
+  }
+
+  if (teamGroups.length === 0) return null;
+
+  return (
+    <>
+      {teamGroups.map(({ teamAbbrev, players }) => {
+        const verb = players.length === 1 ? 'is' : 'are';
+        return (
+          <Text key={teamAbbrev} style={[summaryStyles.paragraph, { color: mutedColor }]}>
+            <Text style={[summaryStyles.bold, { color: textColor }]}>{teamAbbrev}'s</Text>
+            {players.map((p, i) => {
+              const isFirst = i === 0;
+              const isLast = i === players.length - 1;
+              const sep =
+                isFirst ? ' lead ' :
+                isLast && players.length === 2 ? ' and lead ' :
+                isLast ? ', and lead ' :
+                ', lead ';
+              const rolesStr = joinLeadRoles(p.roles);
+              return (
+                <Text key={p.player.athlete_id}>
+                  {sep + rolesStr + ' '}
+                  <Image
+                    source={{ uri: p.player.athlete_headshot_href }}
+                    style={[summaryStyles.inlineAvatar, { backgroundColor: avatarBgColor }]}
+                  />
+                  {' '}
+                  <Text style={[summaryStyles.bold, summaryStyles.outAccent]}>{p.player.athlete_display_name}</Text>
+                </Text>
+              );
+            })}
+            {` ${verb} `}<Text style={[summaryStyles.bold, summaryStyles.outAccent]}>out</Text>{'.'}</Text>
+        );
+      })}
+    </>
+  );
+}
+
+function MatchupSummarySection({
+  game,
+  displayAwayAbbrev,
+  displayHomeAbbrev,
+  awayRecentResults,
+  homeRecentResults,
+  sidelinedStatLeaderLines,
+  seasonSeriesSummaryText,
+  textColor,
+  mutedColor,
+  avatarBgColor,
+}: {
+  game: ScheduleGame;
+  displayAwayAbbrev: string;
+  displayHomeAbbrev: string;
+  awayRecentResults: { wins: number; losses: number; results: ('W' | 'L')[] } | undefined;
+  homeRecentResults: { wins: number; losses: number; results: ('W' | 'L')[] } | undefined;
+  sidelinedStatLeaderLines: SidelinedLine[];
+  seasonSeriesSummaryText: string | null;
+  textColor: string;
+  mutedColor: string;
+  avatarBgColor: string;
+}) {
+  const introSpans = buildIntroParts(
+    displayAwayAbbrev,
+    displayHomeAbbrev,
+    game.awayRecord,
+    game.homeRecord,
+    awayRecentResults,
+    homeRecentResults,
+    game.awayBackToBack,
+    game.homeBackToBack,
+    seasonSeriesSummaryText,
+    game.awayB2BContext,
+    game.homeB2BContext
+  );
+
+  if (introSpans.length === 0 && sidelinedStatLeaderLines.length === 0) return null;
+
+  return (
+    <View style={summaryStyles.container}>
+      {introSpans.length > 0 && (
+        <Text style={[summaryStyles.paragraph, { color: mutedColor }]}>
+          {introSpans.map((span, i) => (
+            <Text
+              key={i}
+              style={[
+                span.bold ? summaryStyles.bold : null,
+                span.accent
+                  ? { color: span.accent }
+                  : span.bold
+                    ? { color: textColor }
+                    : null,
+              ]}
+            >
+              {span.text}
+            </Text>
+          ))}
+        </Text>
+      )}
+      {/* OLD: separate avatar rows per player
+      {sidelinedStatLeaderLines.map((line) => {
+        const rolesPhrase = joinLeadRoles(line.stats.map((s) => getLeadRoleNoun(s.stat)));
+        return (
+          <View key={`${line.teamAbbrev}-${line.player.athlete_id}`} style={summaryStyles.playerRow}>
+            <PlayerAvatar uri={line.player.athlete_headshot_href} size={28} />
+            <Text style={[summaryStyles.paragraph, summaryStyles.playerRowText, { color: mutedColor }]}>
+              <Text style={[summaryStyles.bold, summaryStyles.outAccent]}>{line.player.athlete_display_name}</Text>
+              <Text>{` (${line.teamAbbrev} lead ${rolesPhrase}) is `}</Text>
+              <Text style={[summaryStyles.bold, summaryStyles.outAccent]}>out</Text>
+              <Text>{'.'}</Text>
+            </Text>
+          </View>
+        );
+      })}
+      */}
+      <SidelinedGroupedLines
+        lines={sidelinedStatLeaderLines}
+        textColor={textColor}
+        mutedColor={mutedColor}
+        avatarBgColor={avatarBgColor}
+      />
+    </View>
+  );
+}
+
+const summaryStyles = StyleSheet.create({
+  container: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(37, 37, 37, 0.5)',
+    gap: 10,
+  },
+  paragraph: {
+    fontSize: 18,
+    lineHeight: 28,
+    letterSpacing: -0.2,
+  },
+  bold: {
+    fontWeight: '700',
+  },
+  outAccent: {
+    color: '#e05252',
+  },
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  playerRowText: {
+    flex: 1,
+  },
+  inlineAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    transform: [{ translateY: 5 }],
+  },
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function GameMatchupView({
@@ -306,6 +594,7 @@ export function GameMatchupView({
   boxScores,
   injuries = [],
   liveDataFetchedAt,
+  injurySnapshotCapturedAt,
 }: GameMatchupViewProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -331,7 +620,10 @@ export function GameMatchupView({
     game.awayTeamAbbrev,
     game.homeTeamAbbrev,
     SEASON,
-    5
+    5,
+    // For past games, filter results to before the game date so streaks are point-in-time.
+    // Upcoming games use null (no filter) to get current standings.
+    game.completed ? game.gameDate : null
   );
   const awayRecentResults = matchupContext?.awayRecentResults;
   const homeRecentResults = matchupContext?.homeRecentResults;
@@ -479,6 +771,20 @@ export function GameMatchupView({
     if (awayWins > homeWins) return `${a} leads the season series ${awayWins}–${homeWins}.`;
     return `${h} leads the season series ${homeWins}–${awayWins}.`;
   }, [seasonSeriesRecord, displayAwayAbbrev, displayHomeAbbrev]);
+
+  // Map normalized player name → headshot URL, used to fill in null headshotUrls
+  // on injury entries sourced from the DB backfill (PDFs don't include headshots).
+  const playerHeadshotByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of players) {
+      const url = p.athlete_headshot_href;
+      if (!url) continue;
+      const norm = (name: string) => name.toLowerCase().replace(/\s+/g, ' ').trim();
+      map.set(norm(p.athlete_display_name), url);
+      if (p.athlete_short_name) map.set(norm(p.athlete_short_name), url);
+    }
+    return map;
+  }, [players]);
 
   const injuredOutAthleteIds = useMemo(
     () =>
@@ -941,6 +1247,21 @@ export function GameMatchupView({
     }
   }, [liveDataFetchedAt]);
 
+  const injurySnapshotLabel = useMemo(() => {
+    if (!injurySnapshotCapturedAt) return null;
+    try {
+      const d = new Date(injurySnapshotCapturedAt);
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch {
+      return null;
+    }
+  }, [injurySnapshotCapturedAt]);
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -952,6 +1273,19 @@ export function GameMatchupView({
       <View>
         <GameMatchupDisplay game={game} colorScheme={colorScheme ?? 'light'} />
       </View>
+
+      <MatchupSummarySection
+        game={game}
+        displayAwayAbbrev={displayAwayAbbrev}
+        displayHomeAbbrev={displayHomeAbbrev}
+        awayRecentResults={awayRecentResults}
+        homeRecentResults={homeRecentResults}
+        sidelinedStatLeaderLines={sidelinedStatLeaderLines}
+        seasonSeriesSummaryText={seasonSeriesSummaryText}
+        textColor={colors.text}
+        mutedColor={colors.secondaryText}
+        avatarBgColor={colors.border}
+      />
 
       {injuries.length > 0 && (() => {
         const awayAbbrevSet = new Set(
@@ -975,7 +1309,16 @@ export function GameMatchupView({
         };
         const sortInjuries = (list: ESPNInjuryEntry[]) =>
           [...list].sort((a, b) => statusSortOrder(a.status) - statusSortOrder(b.status));
-        const allInjuries = [...sortInjuries(awayInjuries), ...sortInjuries(homeInjuries)];
+        const fillHeadshot = (inj: ESPNInjuryEntry): ESPNInjuryEntry => {
+          if (inj.headshotUrl) return inj;
+          const norm = (inj.playerName ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const url = playerHeadshotByName.get(norm);
+          return url ? { ...inj, headshotUrl: url } : inj;
+        };
+        const allInjuries = [
+          ...sortInjuries(awayInjuries).map(fillHeadshot),
+          ...sortInjuries(homeInjuries).map(fillHeadshot),
+        ];
         return (
           <View style={styles.sectionOpen}>
             <ThemedText style={styles.sectionTitle}>Injury Report</ThemedText>
@@ -984,23 +1327,11 @@ export function GameMatchupView({
               bgColor={colors.background}
               secondaryText={colors.secondaryText}
             />
-            {sidelinedStatLeaderLines.length > 0
-              ? sidelinedStatLeaderLines.map((line) => (
-                  <View key={`${line.teamAbbrev}-${line.player.athlete_id}`} style={styles.sidelinedStatLeaderRow}>
-                    <Text style={styles.sidelinedStatLeaderEmoji} accessibilityLabel="Alert">
-                      ⚠️
-                    </Text>
-                    <ThemedText style={[styles.sidelinedStatLeaderBody, { color: colors.secondaryText }]}>
-                      {formatSidelinedLeaderBody(
-                        line.teamAbbrev,
-                        line.player.athlete_display_name,
-                        line.stats
-                      )}
-                    </ThemedText>
-                  </View>
-                ))
-              : null}
-            {liveDataAsOfLabel ? (
+            {injurySnapshotLabel ? (
+              <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
+                Injury report as of {injurySnapshotLabel}
+              </ThemedText>
+            ) : liveDataAsOfLabel ? (
               <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
                 Injury report and live data as of {liveDataAsOfLabel}
               </ThemedText>
@@ -1009,10 +1340,10 @@ export function GameMatchupView({
         );
       })()}
 
-      {!injuries.length && liveDataAsOfLabel ? (
+      {!injuries.length && (liveDataAsOfLabel || injurySnapshotLabel) ? (
         <View style={styles.sectionOpen}>
           <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
-            Live data as of {liveDataAsOfLabel}
+            {liveDataAsOfLabel ? `Live data as of ${liveDataAsOfLabel}` : `No injury report recorded`}
           </ThemedText>
         </View>
       ) : null}
@@ -1594,54 +1925,6 @@ export function GameMatchupView({
               </ThemedText>
             </View>
           )}
-        </View>
-      )}
-
-      {game.completed && boxScores.length > 0 && (
-        <View style={[styles.sectionOpen, { backgroundColor: colors.cardBackground }]}>
-          <ThemedText style={styles.sectionTitle}>Top Performers</ThemedText>
-          {(() => {
-            const byTeam = boxScores.reduce(
-              (acc, b) => {
-                const raw = (b.team_abbreviation ?? '').toUpperCase();
-                const t = toThreeLetterAbbrev(raw) || raw;
-                if (!acc[t]) acc[t] = [];
-                acc[t].push(b);
-                return acc;
-              },
-              {} as Record<string, GameBoxScore[]>
-            );
-            const homeAbbrev = toThreeLetterAbbrev((game.homeTeamAbbrev ?? '').toUpperCase()) || (game.homeTeamAbbrev ?? '').toUpperCase();
-            const awayAbbrev = toThreeLetterAbbrev((game.awayTeamAbbrev ?? '').toUpperCase()) || (game.awayTeamAbbrev ?? '').toUpperCase();
-            const homeTop = (byTeam[homeAbbrev] ?? []).slice(0, 3);
-            const awayTop = (byTeam[awayAbbrev] ?? []).slice(0, 3);
-            return (
-              <View style={styles.boxScoreList}>
-                {awayTop.map((b) => (
-                  <View key={b.athlete_id} style={styles.boxScoreRow}>
-                    <PlayerAvatar uri={b.athlete_headshot_href} size={36} />
-                    <View style={styles.boxScoreMeta}>
-                      <ThemedText style={styles.boxScoreName}>{b.athlete_display_name}</ThemedText>
-                      <ThemedText style={[styles.boxScoreStat, { color: colors.secondaryText }]}>
-                        {b.points} pts, {b.rebounds} reb, {b.assists} ast
-                      </ThemedText>
-                    </View>
-                  </View>
-                ))}
-                {homeTop.map((b) => (
-                  <View key={b.athlete_id} style={styles.boxScoreRow}>
-                    <PlayerAvatar uri={b.athlete_headshot_href} size={36} />
-                    <View style={styles.boxScoreMeta}>
-                      <ThemedText style={styles.boxScoreName}>{b.athlete_display_name}</ThemedText>
-                      <ThemedText style={[styles.boxScoreStat, { color: colors.secondaryText }]}>
-                        {b.points} pts, {b.rebounds} reb, {b.assists} ast
-                      </ThemedText>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            );
-          })()}
         </View>
       )}
 

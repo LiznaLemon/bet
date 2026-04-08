@@ -24,7 +24,9 @@ export async function fetchTeamMatchupContext(
   awayAbbrev: string,
   homeAbbrev: string,
   season = 2026,
-  limit = 5
+  limit = 5,
+  /** For past games: filter results/roster to games before this date (YYYY-MM-DD). */
+  gameDate?: string | null
 ): Promise<TeamMatchupContext> {
   const away = (awayAbbrev ?? '').trim();
   const home = (homeAbbrev ?? '').trim();
@@ -42,6 +44,7 @@ export async function fetchTeamMatchupContext(
     p_home_abbrev: home,
     p_season: season,
     p_limit: limit,
+    p_game_date: gameDate ?? null,
   });
 
   if (error) {
@@ -71,13 +74,14 @@ export function useTeamMatchupContext(
   awayAbbrev: string | undefined,
   homeAbbrev: string | undefined,
   season = 2026,
-  limit = 5
+  limit = 5,
+  gameDate?: string | null
 ) {
   const enabled = !!(awayAbbrev?.trim() && homeAbbrev?.trim());
 
   return useQuery({
-    queryKey: ['team-matchup-context', awayAbbrev, homeAbbrev, season, limit],
-    queryFn: () => fetchTeamMatchupContext(awayAbbrev!, homeAbbrev!, season, limit),
+    queryKey: ['team-matchup-context', awayAbbrev, homeAbbrev, season, limit, gameDate ?? null],
+    queryFn: () => fetchTeamMatchupContext(awayAbbrev!, homeAbbrev!, season, limit, gameDate),
     enabled,
     staleTime: 5 * 60 * 1000,
   });

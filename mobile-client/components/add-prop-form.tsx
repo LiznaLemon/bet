@@ -867,7 +867,7 @@ export function AddPropForm({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // paddingHorizontal: 16,
+    paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
     borderColor: 'transparent',

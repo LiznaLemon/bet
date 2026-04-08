@@ -5,3 +5,21 @@ node_modules/
 
 expo-env.d.ts
 # @end expo-cli
+
+# Expo
+.expo/
+dist/
+
+# Environment & secrets
+.env
+.env.*
+
+# Stray files
+image.png
+test.py
+
+# Claude Code
+.claude/
+
+# Planning notes
+markdown_plans/

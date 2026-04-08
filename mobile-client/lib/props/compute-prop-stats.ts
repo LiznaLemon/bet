@@ -268,10 +268,10 @@ export function computePropInsights(
           const b2bHit = backToBackGames.filter((g) =>
             isSingleProp(prop) ? checkSinglePropHit(g, prop) : checkCombinedPropHit(g, prop)
           ).length;
-          b2bSuffix = ` In back-to-back games: ${b2bHit}/${backToBackGames.length} hit (${((b2bHit / backToBackGames.length) * 100).toFixed(0)}%).`;
+          b2bSuffix = ` In back to back games: ${b2bHit}/${backToBackGames.length} hit (${((b2bHit / backToBackGames.length) * 100).toFixed(0)}%).`;
         }
         if (opponent) {
-          insights.push(`Playing a back-to-back tonight against ${opponent}.${b2bSuffix}`);
+          insights.push(`Playing a back to back tonight against ${opponent}.${b2bSuffix}`);
         } else {
           insights.push(`1 day of rest since last game on ${lastGameFmt}${againstStr}.${b2bSuffix}`);
         }

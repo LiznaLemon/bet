@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ScheduleGame } from '@/lib/types';
-import { getDateStrForOffset } from '@/lib/utils/date';
+import { getDateStrForOffset, getPrevDayDateStr } from '@/lib/utils/date';
 import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 
 const EXCLUDED_GAME_IDS = ['401809839', '401838140', '401838141', '401838142', '401838143'];
@@ -174,7 +174,49 @@ export async function fetchGameById(gameId: string, season = 2026): Promise<Sche
   if (error) throw error;
   if (!data || EXCLUDED_GAME_IDS.includes(String(data.game_id))) return null;
 
-  return mapRowToScheduleGame(data as Record<string, unknown>);
+  const game = mapRowToScheduleGame(data as Record<string, unknown>);
+
+  if (game.gameDate) {
+    const prevDay = getPrevDayDateStr(game.gameDate);
+    const homeAliases = getAbbrevAliases((game.homeTeamAbbrev ?? '').toUpperCase());
+    const awayAliases = getAbbrevAliases((game.awayTeamAbbrev ?? '').toUpperCase());
+    const { data: prevGames } = await supabase
+      .from('schedules')
+      .select('home_abbreviation, away_abbreviation, home_score, away_score, status_type_completed')
+      .eq('game_date', prevDay)
+      .eq('season', season)
+      .eq('season_type', 2);
+    if (prevGames) {
+      const buildB2BContext = (aliases: string[]) => {
+        const pg = prevGames.find(
+          (g) =>
+            aliases.includes((g.home_abbreviation ?? '').toUpperCase()) ||
+            aliases.includes((g.away_abbreviation ?? '').toUpperCase())
+        );
+        if (!pg) return undefined;
+        const wasHome = aliases.includes((pg.home_abbreviation ?? '').toUpperCase());
+        const opp = toThreeLetterAbbrev(
+          wasHome
+            ? (pg.away_abbreviation ?? '').toUpperCase()
+            : (pg.home_abbreviation ?? '').toUpperCase()
+        );
+        const hs = pg.home_score as number | null;
+        const as_ = pg.away_score as number | null;
+        const hasResult = hs != null && as_ != null;
+        const won = hasResult ? (wasHome ? hs! > as_! : as_! > hs!) : false;
+        return { opponentAbbrev: opp, wasHome, won, hasResult };
+      };
+
+      const homeCtx = buildB2BContext(homeAliases);
+      const awayCtx = buildB2BContext(awayAliases);
+      game.homeBackToBack = !!homeCtx;
+      game.awayBackToBack = !!awayCtx;
+      if (homeCtx) game.homeB2BContext = homeCtx;
+      if (awayCtx) game.awayB2BContext = awayCtx;
+    }
+  }
+
+  return game;
 }
 
 export function useGame(gameId: string | undefined, season = 2026) {

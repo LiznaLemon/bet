@@ -52,3 +52,5 @@ temp/
 
 # Project-specific
 cloud-config.yml
+uploads/
+scripts/backfill_injury_snapshots.py

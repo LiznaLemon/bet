@@ -4,7 +4,6 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import {
   RivePlayersTabIcon,
-  RivePropsTabIcon,
   RiveScheduleTabIcon,
 } from '@/components/rive-schedule-tab-icon';
 import { Colors } from '@/constants/theme';
@@ -24,12 +23,13 @@ export default function TabLayout() {
         },
         tabBarStyle: {
           backgroundColor: '#000000',
-          borderTopColor: 'rgba(37, 37, 37, 0.5)',
-          // borderTopColor: Colors[colorScheme ?? 'light'].secondaryText,
           borderTopWidth: 0.2,
+          borderTopColor: 'rgba(37, 37, 37, 0.5)',
           paddingTop: 10,
           paddingBottom: 10,
           minHeight: 60,
+          alignSelf: 'center',
+          width: 240,
         },
         tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].secondaryText,
       }}>
@@ -50,8 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="props"
         options={{
-          title: 'Props',
-          tabBarIcon: () => <RivePropsTabIcon />,
+          href: null,
         }}
       />
     </Tabs>

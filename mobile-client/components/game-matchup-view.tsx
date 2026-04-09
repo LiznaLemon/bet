@@ -1424,13 +1424,16 @@ export function GameMatchupView({
               ? fullLog.filter((g) => (g.game_date ?? '') < game.gameDate!)
               : fullLog;
             const gamesVs = getGamesVsOpponent(pitLog, opp);
-            const vsLine = (() => {
+            const vsLineParts = (() => {
               if (gamesVs.length === 0) return null;
               if (gamesVs.length === 1) {
                 const raw = getStatFromGameLog(gamesVs[0], keyMatchupStat);
-                return `Got ${formatVsOpponentSingleGameValue(raw)} ${propStatShortLabel(keyMatchupStat)} vs ${opp} last time`;
+                const statStr = `${formatVsOpponentSingleGameValue(raw)} ${propStatShortLabel(keyMatchupStat)}`;
+                return { prefix: 'Got ', statStr, suffix: ` vs ${opp} last time` };
               }
-              return `Average of ${getSeasonAvgFromGameLog(gamesVs, keyMatchupStat).toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]} in ${gamesVs.length} games vs ${opp}`;
+              const avg = getSeasonAvgFromGameLog(gamesVs, keyMatchupStat);
+              const statStr = `${avg.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
+              return { prefix: 'Average of ', statStr, suffix: ` in ${gamesVs.length} games vs ${opp}` };
             })();
             return (
               <View key={p.athlete_id} style={styles.matchupRow}>
@@ -1469,10 +1472,13 @@ export function GameMatchupView({
                         const l5Avg = last5.length >= 3
                           ? last5.reduce((sum, g) => sum + (getStatFromGameLog(g, keyMatchupStat) || 0), 0) / last5.length
                           : null;
-                        const seasonAvg = primaryStatVal;
-                        const delta = l5Avg !== null ? l5Avg - seasonAvg : null;
-                        const trendStr = delta !== null && Math.abs(delta) >= 0.5
-                          ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]} in L5`
+                        const delta = l5Avg !== null ? l5Avg - primaryStatVal : null;
+                        const trendParts = delta !== null && Math.abs(delta) >= 0.5
+                          ? {
+                              deltaStr: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`,
+                              rest: ' in L5 games',
+                              isPositive: delta >= 0,
+                            }
                           : null;
                         return (
                           <>
@@ -1483,19 +1489,27 @@ export function GameMatchupView({
                               )}
                               {rest ? ` • ${rest}` : ''}
                             </ThemedText>
-                            {trendStr && (
-                              <ThemedText style={[styles.l5Trend, { color: colors.secondaryText }]}>
-                                {trendStr}
+                            {(vsLineParts || trendParts) && (
+                              <ThemedText style={[styles.vsLine, { color: colors.secondaryText }]}>
+                                {vsLineParts && (
+                                  <>
+                                    {vsLineParts.prefix}
+                                    <Text style={{ color: colors.text }}>{vsLineParts.statStr}</Text>
+                                    {vsLineParts.suffix}
+                                  </>
+                                )}
+                                {vsLineParts && trendParts ? '. ' : null}
+                                {trendParts && (
+                                  <>
+                                    <Text style={{ color: trendParts.isPositive ? '#22c55e' : '#ef4444' }}>{trendParts.deltaStr}</Text>
+                                    {trendParts.rest}
+                                  </>
+                                )}
                               </ThemedText>
                             )}
                           </>
                         );
                       })()}
-                    {vsLine && (
-                      <ThemedText style={[styles.vsLine, { color: colors.tint }]}>
-                        {vsLine}
-                      </ThemedText>
-                    )}
                   </View>
                 </Pressable>
                 {/* <View style={styles.similarSection}>
@@ -2244,10 +2258,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   vsLine: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  l5Trend: {
     fontSize: 12,
     marginTop: 2,
   },

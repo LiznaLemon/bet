@@ -50,12 +50,14 @@ export type PlayerStatRanks = {
 
 export async function fetchPlayerStatRanks(
   season: number,
-  athleteIds: string[]
+  athleteIds: string[],
+  asOfDate?: string
 ): Promise<Record<string, PlayerStatRanks>> {
   const { data, error } = await supabase.rpc('get_player_stat_ranks', {
     p_season: season,
     p_season_type: 2,
     p_athlete_ids: athleteIds,
+    ...(asOfDate ? { p_as_of_date: asOfDate } : {}),
   });
   if (error) {
     console.error('[fetchPlayerStatRanks] RPC error:', error.message);
@@ -65,11 +67,11 @@ export async function fetchPlayerStatRanks(
   return Object.fromEntries(rows.map((r) => [r.athlete_id, r]));
 }
 
-export function usePlayerStatRanks(season: number, athleteIds: string[]) {
+export function usePlayerStatRanks(season: number, athleteIds: string[], asOfDate?: string) {
   const ids = [...new Set(athleteIds)].filter(Boolean).sort();
   return useQuery({
-    queryKey: ['player-stat-ranks', season, ids.length === 0 ? 'all' : ids],
-    queryFn: () => fetchPlayerStatRanks(season, ids),
+    queryKey: ['player-stat-ranks', season, ids.length === 0 ? 'all' : ids, asOfDate ?? null],
+    queryFn: () => fetchPlayerStatRanks(season, ids, asOfDate),
     staleTime: 5 * 60 * 1000,
   });
 }

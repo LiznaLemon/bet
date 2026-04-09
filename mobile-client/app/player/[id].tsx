@@ -308,7 +308,18 @@ function computeAverageInsights(
   allPlayers: EnhancedPlayer[]
 ): string[] {
   const insights: string[] = [];
-  const qualified = allPlayers.filter((p) => Number(p.games_played ?? 0) >= 10);
+  // Mirror the DB's qualification threshold: gp >= team_gp * 0.7.
+  // Estimate each team's game count as the max games played by any player on that team.
+  const teamMaxGames = new Map<string, number>();
+  for (const p of allPlayers) {
+    const ta = String(p.team_abbreviation ?? '');
+    const gp = Number(p.games_played ?? 0);
+    teamMaxGames.set(ta, Math.max(teamMaxGames.get(ta) ?? 0, gp));
+  }
+  const qualified = allPlayers.filter((p) => {
+    const teamGp = teamMaxGames.get(String(p.team_abbreviation ?? '')) ?? 0;
+    return Number(p.games_played ?? 0) >= teamGp * 0.7;
+  });
   if (qualified.length === 0) return insights;
 
   const getPpg = (p: EnhancedPlayer) =>

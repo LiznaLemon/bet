@@ -476,6 +476,7 @@ function MatchupSummarySection({
   textColor,
   mutedColor,
   avatarBgColor,
+  isLoading,
 }: {
   game: ScheduleGame;
   displayAwayAbbrev: string;
@@ -487,6 +488,7 @@ function MatchupSummarySection({
   textColor: string;
   mutedColor: string;
   avatarBgColor: string;
+  isLoading: boolean;
 }) {
   const introSpans = buildIntroParts(
     displayAwayAbbrev,
@@ -502,7 +504,11 @@ function MatchupSummarySection({
     game.homeB2BContext
   );
 
-  if (introSpans.length === 0 && sidelinedStatLeaderLines.length === 0) return null;
+  if (introSpans.length === 0 && sidelinedStatLeaderLines.length === 0) {
+    // While loading, reserve the space so content popping in doesn't shift the layout below.
+    if (isLoading) return <View style={summaryStyles.container} />;
+    return null;
+  }
 
   return (
     <View style={summaryStyles.container}>
@@ -616,7 +622,7 @@ export function GameMatchupView({
   const teamOffensiveLoading = bundleLoading;
   const teamOffensiveSeasonError = bundleError;
 
-  const { data: matchupContext } = useTeamMatchupContext(
+  const { data: matchupContext, isLoading: matchupContextLoading } = useTeamMatchupContext(
     game.awayTeamAbbrev,
     game.homeTeamAbbrev,
     SEASON,
@@ -645,7 +651,7 @@ export function GameMatchupView({
     [game.homeTeamAbbrev]
   );
 
-  const { data: previousMatchups = [] } = usePreviousMatchups(
+  const { data: previousMatchups = [], isLoading: previousMatchupsLoading } = usePreviousMatchups(
     game.homeTeamAbbrev,
     game.awayTeamAbbrev,
     SEASON,
@@ -760,6 +766,8 @@ export function GameMatchupView({
     }
     return { awayWins, homeWins };
   }, [previousMatchups, displayAwayAbbrev, displayHomeAbbrev]);
+
+  const summaryLoading = matchupContextLoading || previousMatchupsLoading;
 
   const seasonSeriesSummaryText = useMemo(() => {
     if (!seasonSeriesRecord) return null;
@@ -1285,6 +1293,7 @@ export function GameMatchupView({
         textColor={colors.text}
         mutedColor={colors.secondaryText}
         avatarBgColor={colors.border}
+        isLoading={summaryLoading}
       />
 
       {injuries.length > 0 && (() => {

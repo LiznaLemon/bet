@@ -12,7 +12,8 @@ import { useStoredInjuries } from '@/lib/queries/game-injury-reports';
 import { useGameBoxScores } from '@/lib/queries/game-boxscores';
 import { usePlayByPlay } from '@/lib/queries/play-by-play';
 import { usePlayersForTeams } from '@/lib/queries/players-for-teams';
-import { useGame } from '@/lib/queries/schedule';
+import { usePreviousMatchups, useGame } from '@/lib/queries/schedule';
+import { useTeamMatchupContext } from '@/lib/queries/team-matchup-context';
 import type { PlayerProp } from '@/lib/types/props';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect } from '@react-navigation/native';
@@ -81,8 +82,26 @@ export default function GameDetailScreen() {
     }
   }, [game?.completed, isLiveESPN]);
 
+  // Pre-fetch summary queries at the screen level so their loading states can gate the skeleton.
+  // GameMatchupView calls the same hooks internally — React Query deduplicates, no double fetch.
+  const { isLoading: matchupContextLoading } = useTeamMatchupContext(
+    game?.awayTeamAbbrev,
+    game?.homeTeamAbbrev,
+    SEASON,
+    5,
+    game?.completed ? game.gameDate : null
+  );
+  const { isLoading: previousMatchupsLoading } = usePreviousMatchups(
+    game?.homeTeamAbbrev,
+    game?.awayTeamAbbrev,
+    SEASON,
+    id
+  );
+
   // Fade in the matchup tab content once the primary data is ready
-  const matchupReady = !gameLoading && !playersLoading && !!game;
+  const matchupReady =
+    !gameLoading && !playersLoading && !!game &&
+    !matchupContextLoading && !previousMatchupsLoading;
   const matchupOpacity = useFadeTransition(id, matchupReady);
 
   if (!id) {

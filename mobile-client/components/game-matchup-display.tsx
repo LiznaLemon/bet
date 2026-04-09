@@ -99,6 +99,7 @@ function formatDateLabel(game: ScheduleGame): string {
   if (d.toDateString() === today.toDateString()) label = 'Today';
   else if (d.toDateString() === tomorrow.toDateString()) label = 'Tomorrow';
   else label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (game.completed) return game.gameTime ? `${label} - ${game.gameTime}` : label;
   return game.gameTime ? `${label} at ${game.gameTime}` : label;
 }
 

@@ -150,6 +150,18 @@ function propStatToRankField(stat: PropStatKey): 'ppg_rank' | 'rpg_rank' | 'apg_
   return map[stat] ?? null;
 }
 
+function propStatToAvgField(stat: PropStatKey): 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg' | 'three_pm' | null {
+  const map: Partial<Record<PropStatKey, 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg' | 'three_pm'>> = {
+    points: 'ppg',
+    rebounds: 'rpg',
+    assists: 'apg',
+    steals: 'spg',
+    blocks: 'bpg',
+    three_pt_made: 'three_pm',
+  };
+  return map[stat] ?? null;
+}
+
 function formatVsOpponentSingleGameValue(val: number): string {
   if (Number.isInteger(val) || Math.abs(val - Math.round(val)) < 1e-6) {
     return String(Math.round(val));
@@ -1435,15 +1447,21 @@ export function GameMatchupView({
                     </ThemedText>
                     {(() => {
                         const fmt = (v: number) => v.toFixed(1);
-                        const primaryVal = `${fmt(pitStats?.[keyMatchupStat] ?? getPlayerSeasonAvgFromTotals(p, keyMatchupStat))} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
                         const rankField = propStatToRankField(keyMatchupStat);
+                        const avgField = propStatToAvgField(keyMatchupStat);
                         const rank = rankField ? playerStatRanks[p.athlete_id]?.[rankField] : null;
+                        // Use true PIT average from rank RPC when available; fall back to season totals
+                        const pitRpcAvg = avgField ? playerStatRanks[p.athlete_id]?.[avgField] : null;
+                        const primaryStatVal = pitRpcAvg != null ? pitRpcAvg : getPlayerSeasonAvgFromTotals(p, keyMatchupStat);
+                        const primaryVal = `${fmt(primaryStatVal)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
                         const others = otherPropStatKeysForRow(keyMatchupStat);
                         const rest = others
-                          .map(
-                            (s) =>
-                              `${fmt(pitStats?.[s] ?? getPlayerSeasonAvgFromTotals(p, s))} ${PROP_STAT_PLAYER_ROW_LABEL[s]}`
-                          )
+                          .map((s) => {
+                            const otherAvgField = propStatToAvgField(s);
+                            const otherAvg = otherAvgField ? playerStatRanks[p.athlete_id]?.[otherAvgField] : null;
+                            const val = otherAvg != null ? otherAvg : getPlayerSeasonAvgFromTotals(p, s);
+                            return `${fmt(val)} ${PROP_STAT_PLAYER_ROW_LABEL[s]}`;
+                          })
                           .join(' • ');
                         const last5 = [...pitLog]
                           .sort((a, b) => (b.game_date ?? '').localeCompare(a.game_date ?? ''))
@@ -1451,7 +1469,7 @@ export function GameMatchupView({
                         const l5Avg = last5.length >= 3
                           ? last5.reduce((sum, g) => sum + (getStatFromGameLog(g, keyMatchupStat) || 0), 0) / last5.length
                           : null;
-                        const seasonAvg = pitStats?.[keyMatchupStat] ?? getPlayerSeasonAvgFromTotals(p, keyMatchupStat);
+                        const seasonAvg = primaryStatVal;
                         const delta = l5Avg !== null ? l5Avg - seasonAvg : null;
                         const trendStr = delta !== null && Math.abs(delta) >= 0.5
                           ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]} in L5`

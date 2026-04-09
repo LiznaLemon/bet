@@ -39,13 +39,19 @@ export function usePlayers(season = 2026) {
 
 export type PlayerStatRanks = {
   athlete_id: string;
+  /** Season-to-date (or PIT) averages returned alongside ranks */
+  ppg: number;
+  rpg: number;
+  apg: number;
+  spg: number;
+  bpg: number;
+  three_pm: number;
   ppg_rank: number;
   rpg_rank: number;
   apg_rank: number;
   spg_rank: number;
   bpg_rank: number;
-  /** 3PT made per game rank (from get_player_stat_ranks migration 20250321) */
-  three_pm_rank?: number;
+  three_pm_rank: number;
 };
 
 export async function fetchPlayerStatRanks(

@@ -26,11 +26,10 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSequence,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 
+import { PlayerDetailSkeleton } from '@/components/ui/player-detail-skeleton';
 import { getUpcomingGamesFallback } from '@/constants/schedule';
 import { Colors } from '@/constants/theme';
 import { usePlayers } from '@/lib/queries/players';
@@ -309,7 +308,18 @@ function computeAverageInsights(
   allPlayers: EnhancedPlayer[]
 ): string[] {
   const insights: string[] = [];
-  const qualified = allPlayers.filter((p) => Number(p.games_played ?? 0) >= 10);
+  // Mirror the DB's qualification threshold: gp >= team_gp * 0.7.
+  // Estimate each team's game count as the max games played by any player on that team.
+  const teamMaxGames = new Map<string, number>();
+  for (const p of allPlayers) {
+    const ta = String(p.team_abbreviation ?? '');
+    const gp = Number(p.games_played ?? 0);
+    teamMaxGames.set(ta, Math.max(teamMaxGames.get(ta) ?? 0, gp));
+  }
+  const qualified = allPlayers.filter((p) => {
+    const teamGp = teamMaxGames.get(String(p.team_abbreviation ?? '')) ?? 0;
+    return Number(p.games_played ?? 0) >= teamGp * 0.7;
+  });
   if (qualified.length === 0) return insights;
 
   const getPpg = (p: EnhancedPlayer) =>
@@ -732,17 +742,6 @@ function AnimatedStatCard({
   return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
 }
 
-function StatsOverlay({ opacity }: { opacity: SharedValue<number> }) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-  return (
-    <Animated.View
-      style={[styles.statsOverlay, animatedStyle]}
-      pointerEvents="none"
-    />
-  );
-}
 
 export default function PlayerDetailScreen() {
   const { id, name, from } = useLocalSearchParams<{ id: string; name?: string; from?: string }>();
@@ -750,29 +749,49 @@ export default function PlayerDetailScreen() {
   const tintColor = Colors[colorScheme ?? 'light'].tint;
   const backLabel = from || 'Players';
   const headerHeight = useHeaderHeight();
-  const { data: playersData = [], isLoading: playersLoading } = usePlayers();
+  const { data: playersData = [], isLoading: playersLoading, isError: playersError, refetch: refetchPlayers } = usePlayers();
   const { data: scheduleData = [] } = useSchedule();
   const { data: fetchedShots = [], isLoading: shotsLoading } = useShots(id, 2026);
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('season');
-  const statsOverlayOpacity = useSharedValue(0);
-  const isInitialMount = useRef(true);
   const [chartStat, setChartStat] = useState<ChartStatKey>('points');
+
+  // Fade in the full screen when player data first arrives
+  const screenOpacity = useSharedValue(0);
+  const screenAnimatedStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
+
+  // Fade stats content on time period change
+  const timePeriodOpacity = useSharedValue(1);
+  const timePeriodAnimatedStyle = useAnimatedStyle(() => ({ opacity: timePeriodOpacity.value }));
+
+  // Fade chart on stat pill change
+  const chartOpacity = useSharedValue(1);
+  const chartAnimatedStyle = useAnimatedStyle(() => ({ opacity: chartOpacity.value }));
   const statSections = useMemo(() => getStatSections(), []);
   const { width: screenWidth } = useWindowDimensions();
 
   const player = (playersData as EnhancedPlayer[]).find((p) => p.athlete_id === id);
 
+  // Fade in once player data is ready
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+    if (!playersLoading && player) {
+      screenOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.ease) });
+    } else {
+      screenOpacity.value = 0;
     }
-    statsOverlayOpacity.value = withSequence(
-      withTiming(0.35, { duration: 80, easing: Easing.out(Easing.ease) }),
-      withTiming(0, { duration: 180, easing: Easing.inOut(Easing.ease) }),
-    );
+  }, [playersLoading, !!player]);
+
+  // Fade stats content on time period change
+  useEffect(() => {
+    timePeriodOpacity.value = 0;
+    timePeriodOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
   }, [timePeriod]);
+
+  // Fade chart on stat pill change
+  useEffect(() => {
+    chartOpacity.value = 0;
+    chartOpacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.ease) });
+  }, [chartStat]);
 
   const gameLog = player ? ((player.game_log ?? []) as GameLogEntry[]) : [];
 
@@ -826,7 +845,27 @@ export default function PlayerDetailScreen() {
       <>
         <Stack.Screen options={{ title: name ?? '', headerLeft }} />
         <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
-          <ThemedText>Loading player...</ThemedText>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <PlayerDetailSkeleton />
+          </ScrollView>
+        </ThemedView>
+      </>
+    );
+  }
+
+  if (playersError) {
+    return (
+      <>
+        <Stack.Screen options={{ title: name ?? 'Player', headerLeft }} />
+        <ThemedView style={[styles.container, styles.centerContent, { paddingTop: headerHeight }]}>
+          <ThemedText style={styles.errorText}>Couldn't load player</ThemedText>
+          <Pressable
+            style={[styles.retryButton, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
+            onPress={() => void refetchPlayers()}>
+            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+              Tap to retry
+            </ThemedText>
+          </Pressable>
         </ThemedView>
       </>
     );
@@ -836,8 +875,8 @@ export default function PlayerDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: name ?? 'Player', headerLeft }} />
-        <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
-          <ThemedText>Player not found</ThemedText>
+        <ThemedView style={[styles.container, styles.centerContent, { paddingTop: headerHeight }]}>
+          <ThemedText style={styles.errorText}>Player not found</ThemedText>
         </ThemedView>
       </>
     );
@@ -874,6 +913,7 @@ export default function PlayerDetailScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ title: player.athlete_display_name, headerLeft }} />
 
+      <Animated.View style={[StyleSheet.absoluteFill, screenAnimatedStyle]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: headerHeight }}
@@ -918,7 +958,7 @@ export default function PlayerDetailScreen() {
             />
           </View>
 
-          <View style={styles.statsContentWrapper}>
+          <Animated.View style={[styles.statsContentWrapper, timePeriodAnimatedStyle]}>
           {/* Bar chart - always full season; time filter highlights last N games */}
           {(() => {
             const chartData = seasonPerGame.data;
@@ -938,7 +978,7 @@ export default function PlayerDetailScreen() {
                   : 5;
 
             return (
-              <View style={[styles.chartCard, { marginBottom: 20 }]}>
+              <Animated.View style={[styles.chartCard, { marginBottom: 20 }, chartAnimatedStyle]}>
                 <View style={styles.chartStatTabs}>
                   <FilterOptionButtons
                     options={[
@@ -970,7 +1010,7 @@ export default function PlayerDetailScreen() {
                 {trendInsights.length > 0 && (
                   <InsightCarousel insights={trendInsights} style={styles.insightCarouselChart} cycleDurationMs={5000} />
                 )}
-              </View>
+              </Animated.View>
             );
           })()}
 
@@ -1075,8 +1115,7 @@ export default function PlayerDetailScreen() {
               </View>
             );
           })}
-          <StatsOverlay opacity={statsOverlayOpacity} />
-          </View>
+          </Animated.View>
         </View>
 
         {/* SPLITS */}
@@ -1208,6 +1247,7 @@ export default function PlayerDetailScreen() {
         )} */}
 
       </ScrollView>
+      </Animated.View>
     </ThemedView>
   );
 }
@@ -1270,13 +1310,27 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  statsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'black',
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 20,

@@ -138,6 +138,30 @@ function propStatShortLabel(stat: PropStatKey): string {
   return PROP_STAT_OPTIONS.find((o) => o.key === stat)?.label ?? PROP_STAT_PLAYER_ROW_LABEL[stat];
 }
 
+function propStatToRankField(stat: PropStatKey): 'ppg_rank' | 'rpg_rank' | 'apg_rank' | 'spg_rank' | 'bpg_rank' | 'three_pm_rank' | null {
+  const map: Partial<Record<PropStatKey, 'ppg_rank' | 'rpg_rank' | 'apg_rank' | 'spg_rank' | 'bpg_rank' | 'three_pm_rank'>> = {
+    points: 'ppg_rank',
+    rebounds: 'rpg_rank',
+    assists: 'apg_rank',
+    steals: 'spg_rank',
+    blocks: 'bpg_rank',
+    three_pt_made: 'three_pm_rank',
+  };
+  return map[stat] ?? null;
+}
+
+function propStatToAvgField(stat: PropStatKey): 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg' | 'three_pm' | null {
+  const map: Partial<Record<PropStatKey, 'ppg' | 'rpg' | 'apg' | 'spg' | 'bpg' | 'three_pm'>> = {
+    points: 'ppg',
+    rebounds: 'rpg',
+    assists: 'apg',
+    steals: 'spg',
+    blocks: 'bpg',
+    three_pt_made: 'three_pm',
+  };
+  return map[stat] ?? null;
+}
+
 function formatVsOpponentSingleGameValue(val: number): string {
   if (Number.isInteger(val) || Math.abs(val - Math.round(val)) < 1e-6) {
     return String(Math.round(val));
@@ -1116,7 +1140,21 @@ export function GameMatchupView({
     ].filter(Boolean) as string[];
   }, [activeAwayPlayers, activeHomePlayers]);
 
-  const { data: playerStatRanks = {} } = usePlayerStatRanks(SEASON, mismatchAlertPlayerIds);
+  const approxTopPlayerIds = useMemo(
+    () =>
+      [...activeAwayPlayers, ...activeHomePlayers]
+        .sort((a, b) => getPlayerSeasonAvgFromTotals(b, keyMatchupStat) - getPlayerSeasonAvgFromTotals(a, keyMatchupStat))
+        .slice(0, 6)
+        .map((p) => p.athlete_id),
+    [activeAwayPlayers, activeHomePlayers, keyMatchupStat]
+  );
+
+  const allStatRankIds = useMemo(
+    () => [...new Set([...mismatchAlertPlayerIds, ...approxTopPlayerIds])],
+    [mismatchAlertPlayerIds, approxTopPlayerIds]
+  );
+
+  const { data: playerStatRanks = {} } = usePlayerStatRanks(SEASON, allStatRankIds, game.gameDate ?? undefined);
 
   const mismatchAlerts = useMemo(() => {
     if (teamDefenseError || !teamDefenseSeason.length) return [];
@@ -1386,13 +1424,16 @@ export function GameMatchupView({
               ? fullLog.filter((g) => (g.game_date ?? '') < game.gameDate!)
               : fullLog;
             const gamesVs = getGamesVsOpponent(pitLog, opp);
-            const vsLine = (() => {
+            const vsLineParts = (() => {
               if (gamesVs.length === 0) return null;
               if (gamesVs.length === 1) {
                 const raw = getStatFromGameLog(gamesVs[0], keyMatchupStat);
-                return `Got ${formatVsOpponentSingleGameValue(raw)} ${propStatShortLabel(keyMatchupStat)} vs ${opp} last time`;
+                const statStr = `${formatVsOpponentSingleGameValue(raw)} ${propStatShortLabel(keyMatchupStat)}`;
+                return { prefix: 'Got ', statStr, suffix: ` vs ${opp} last time` };
               }
-              return `Average of ${getSeasonAvgFromGameLog(gamesVs, keyMatchupStat).toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]} in ${gamesVs.length} games vs ${opp}`;
+              const avg = getSeasonAvgFromGameLog(gamesVs, keyMatchupStat);
+              const statStr = `${avg.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
+              return { prefix: 'Average of ', statStr, suffix: ` in ${gamesVs.length} games vs ${opp}` };
             })();
             return (
               <View key={p.athlete_id} style={styles.matchupRow}>
@@ -1407,25 +1448,68 @@ export function GameMatchupView({
                         {' '}({toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase())})
                       </ThemedText>
                     </ThemedText>
-                    <ThemedText style={[styles.playerStat, { color: colors.secondaryText }]}>
-                      {(() => {
+                    {(() => {
                         const fmt = (v: number) => v.toFixed(1);
-                        const primary = `${fmt(pitStats?.[keyMatchupStat] ?? getPlayerSeasonAvgFromTotals(p, keyMatchupStat))} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
+                        const rankField = propStatToRankField(keyMatchupStat);
+                        const avgField = propStatToAvgField(keyMatchupStat);
+                        const rank = rankField ? playerStatRanks[p.athlete_id]?.[rankField] : null;
+                        // Use true PIT average from rank RPC when available; fall back to season totals
+                        const pitRpcAvg = avgField ? playerStatRanks[p.athlete_id]?.[avgField] : null;
+                        const primaryStatVal = pitRpcAvg != null ? pitRpcAvg : getPlayerSeasonAvgFromTotals(p, keyMatchupStat);
+                        const primaryVal = `${fmt(primaryStatVal)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
                         const others = otherPropStatKeysForRow(keyMatchupStat);
                         const rest = others
-                          .map(
-                            (s) =>
-                              `${fmt(pitStats?.[s] ?? getPlayerSeasonAvgFromTotals(p, s))} ${PROP_STAT_PLAYER_ROW_LABEL[s]}`
-                          )
+                          .map((s) => {
+                            const otherAvgField = propStatToAvgField(s);
+                            const otherAvg = otherAvgField ? playerStatRanks[p.athlete_id]?.[otherAvgField] : null;
+                            const val = otherAvg != null ? otherAvg : getPlayerSeasonAvgFromTotals(p, s);
+                            return `${fmt(val)} ${PROP_STAT_PLAYER_ROW_LABEL[s]}`;
+                          })
                           .join(' • ');
-                        return rest ? `${primary} • ${rest}` : primary;
+                        const last5 = [...pitLog]
+                          .sort((a, b) => (b.game_date ?? '').localeCompare(a.game_date ?? ''))
+                          .slice(0, 5);
+                        const l5Avg = last5.length >= 3
+                          ? last5.reduce((sum, g) => sum + (getStatFromGameLog(g, keyMatchupStat) || 0), 0) / last5.length
+                          : null;
+                        const delta = l5Avg !== null ? l5Avg - primaryStatVal : null;
+                        const trendParts = delta !== null && Math.abs(delta) >= 0.5
+                          ? {
+                              deltaStr: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`,
+                              rest: ' in L5 games',
+                              isPositive: delta >= 0,
+                            }
+                          : null;
+                        return (
+                          <>
+                            <ThemedText style={[styles.playerStat, { color: colors.secondaryText }]}>
+                              {primaryVal}
+                              {rank != null && rank <= 25 && (
+                                <Text style={{ color: colors.text, fontWeight: '700' }}>{` (#${rank})`}</Text>
+                              )}
+                              {rest ? ` • ${rest}` : ''}
+                            </ThemedText>
+                            {(vsLineParts || trendParts) && (
+                              <ThemedText style={[styles.vsLine, { color: colors.secondaryText }]}>
+                                {vsLineParts && (
+                                  <>
+                                    {vsLineParts.prefix}
+                                    <Text style={{ color: colors.text }}>{vsLineParts.statStr}</Text>
+                                    {vsLineParts.suffix}
+                                  </>
+                                )}
+                                {vsLineParts && trendParts ? '. ' : null}
+                                {trendParts && (
+                                  <>
+                                    <Text style={{ color: trendParts.isPositive ? '#22c55e' : '#ef4444' }}>{trendParts.deltaStr}</Text>
+                                    {trendParts.rest}
+                                  </>
+                                )}
+                              </ThemedText>
+                            )}
+                          </>
+                        );
                       })()}
-                    </ThemedText>
-                    {vsLine && (
-                      <ThemedText style={[styles.vsLine, { color: colors.tint }]}>
-                        {vsLine}
-                      </ThemedText>
-                    )}
                   </View>
                 </Pressable>
                 {/* <View style={styles.similarSection}>

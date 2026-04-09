@@ -2,13 +2,15 @@ import { FilterOptionButtons } from '@/components/filter-option-buttons';
 import { PlayerCard } from '@/components/player-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { PlayerListSkeleton } from '@/components/ui/player-list-skeleton';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFadeTransition } from '@/hooks/use-fade-transition';
 import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
 import type { Player } from '@/lib/types';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   FlatList,
   Platform,
   Pressable,
@@ -18,13 +20,6 @@ import {
   TextInput,
   View
 } from 'react-native';
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 
 type SortOption = 'ppg' | 'rpg' | 'apg' | '3pm' | 'spg' | 'bpg';
 
@@ -58,6 +53,9 @@ export default function PlayersScreen() {
   const handleRefresh = useCallback(() => {
     refetch();
   }, [refetch]);
+  const isSortPending = sortBy !== deferredSortBy;
+  const listOpacity = useFadeTransition(sortBy, !isLoading && !isSortPending);
+
   const [cardLayout, setCardLayout] = useState<'default' | 'compact' | 'detailed' | 'wide' | 'long'>('long');
   const triggerMapRef = useRef<Record<string, number>>({});
   const triggerCounterRef = useRef(0);
@@ -87,25 +85,6 @@ export default function PlayersScreen() {
     itemVisiblePercentThreshold: 50,
     minimumViewTime: 50,
   }).current;
-
-  const overlayOpacity = useSharedValue(0);
-  const [showOverlay, setShowOverlay] = useState(false);
-
-  const handleSortPress = useCallback((key: SortOption) => {
-    setSortBy(key);
-    setShowOverlay(true);
-    overlayOpacity.value = 1;
-    overlayOpacity.value = withTiming(0, {
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-    }, (finished) => {
-      if (finished) runOnJS(setShowOverlay)(false);
-    });
-  }, []);
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -231,7 +210,7 @@ export default function PlayersScreen() {
             { key: 'bpg', label: 'Blocks' },
           ]}
           value={sortBy}
-          onSelect={(key) => handleSortPress(key as SortOption)}
+          onSelect={(key) => setSortBy(key as SortOption)}
           colorScheme={colorScheme}
           scrollable
         />
@@ -244,12 +223,7 @@ export default function PlayersScreen() {
 
       {/* Players List */}
       <View style={styles.listWrapper}>
-        {isLoading ? (
-          <View style={styles.centerMessage}>
-            <ActivityIndicator size="large" color={Colors[colorScheme].tint} />
-            <ThemedText style={[styles.loading, { marginTop: 12 }]}>Loading players...</ThemedText>
-          </View>
-        ) : isError ? (
+        {isError && !isLoading ? (
           <ScrollView
             contentContainerStyle={styles.centerMessage}
             refreshControl={
@@ -259,73 +233,66 @@ export default function PlayersScreen() {
                 tintColor={Colors[colorScheme].tint}
               />
             }>
-            <ThemedText style={styles.errorText}>Failed to load players</ThemedText>
+            <ThemedText style={styles.errorText}>Couldn't load players</ThemedText>
             <ThemedText style={[styles.errorSubtext, { color: Colors[colorScheme].secondaryText }]}>
               {error instanceof Error ? error.message : 'Network or server error'}
             </ThemedText>
-            <ThemedText style={[styles.errorSubtext, { color: Colors[colorScheme].secondaryText, marginTop: 12 }]}>
-              Pull down to refresh or tap Retry
-            </ThemedText>
             <Pressable
-              style={[styles.retryButton, { backgroundColor: Colors[colorScheme].tint }]}
+              style={[styles.retryButton, { borderColor: Colors[colorScheme].tint }]}
               onPress={handleRefresh}>
-              <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+              <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme].tint }]}>
+                Tap to retry
+              </ThemedText>
             </Pressable>
           </ScrollView>
+        ) : isLoading || isSortPending ? (
+          <PlayerListSkeleton />
         ) : (
-          <FlatList
-            data={playersData}
-            renderItem={renderPlayer}
-            keyExtractor={item => item.athlete_id}
-            contentContainerStyle={[
-              styles.listContent,
-              playersData.length === 0 && styles.listContentEmpty,
-            ]}
-            showsVerticalScrollIndicator={false}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            getItemLayout={getItemLayout}
-            extraData={animationVersion}
-            initialNumToRender={8}
-            maxToRenderPerBatch={10}
-            windowSize={11}
-            removeClippedSubviews={Platform.OS === 'android'}
-            onEndReached={handleEndReached}
-            onEndReachedThreshold={0.5}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching && !isFetchingNextPage}
-                onRefresh={handleRefresh}
-                tintColor={Colors[colorScheme].tint}
-              />
-            }
-            ListFooterComponent={
-              isFetchingNextPage ? (
-                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={Colors[colorScheme].tint} />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              playersData.length === 0 ? (
+          <Animated.View style={[styles.listAnimatedWrapper, { opacity: listOpacity }]}>
+            <FlatList
+              data={playersData}
+              renderItem={renderPlayer}
+              keyExtractor={item => item.athlete_id}
+              contentContainerStyle={[
+                styles.listContent,
+                playersData.length === 0 && styles.listContentEmpty,
+              ]}
+              showsVerticalScrollIndicator={false}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              getItemLayout={getItemLayout}
+              extraData={animationVersion}
+              initialNumToRender={8}
+              maxToRenderPerBatch={10}
+              windowSize={11}
+              removeClippedSubviews={Platform.OS === 'android'}
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.5}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefetching && !isFetchingNextPage}
+                  onRefresh={handleRefresh}
+                  tintColor={Colors[colorScheme].tint}
+                />
+              }
+              ListFooterComponent={
+                isFetchingNextPage ? (
+                  <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                    <ThemedText style={[styles.errorSubtext, { color: Colors[colorScheme].secondaryText }]}>
+                      Loading more…
+                    </ThemedText>
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
                 <View style={styles.centerMessage}>
                   <ThemedText style={styles.emptyText}>
                     {searchQuery ? 'No players match your search' : 'No players found'}
                   </ThemedText>
                 </View>
-              ) : null
-            }
-          />
-        )}
-        {showOverlay && (
-          <Animated.View
-            style={[
-              styles.sortOverlay,
-              { backgroundColor: Colors[colorScheme].background },
-              overlayAnimatedStyle,
-            ]}
-            pointerEvents="none"
-          />
+              }
+            />
+          </Animated.View>
         )}
       </View>
     </ThemedView>
@@ -364,10 +331,9 @@ const styles = StyleSheet.create({
   },
   listWrapper: {
     flex: 1,
-    position: 'relative',
   },
-  sortOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  listAnimatedWrapper: {
+    flex: 1,
   },
   sortLabel: {
     fontSize: 14,
@@ -385,10 +351,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-    paddingTop: 20,
-  },
-  loading: {
-    paddingHorizontal: 20,
     paddingTop: 20,
   },
   centerMessage: {
@@ -410,15 +372,12 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: 20,
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
+    borderWidth: 1,
   },
   retryButtonText: {
-    color: '#000',
-    // backgroundColor: '#000000',
-    // borderWidth: 1,
-    // borderColor: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   emptyText: {

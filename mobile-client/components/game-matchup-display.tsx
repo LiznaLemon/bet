@@ -99,6 +99,8 @@ export function GameMatchupDisplay({
   const homeRecord =
     formatRecordForDisplay(game.homeRecord) != null ? game.homeRecord : enrichedGame?.homeRecord ?? null;
 
+  const seriesHeadline = game.seriesHeadline ?? null;
+
   return (
     <>
       <View style={styles.headerTop}>
@@ -110,6 +112,11 @@ export function GameMatchupDisplay({
         ) : (
           <ThemedText style={styles.dateLabel}>{formatDateLabel(game)}</ThemedText>
         )}
+        {seriesHeadline ? (
+          <ThemedText style={[styles.seriesHeadline, { color: colors.textSecondary }]}>
+            {seriesHeadline}
+          </ThemedText>
+        ) : null}
       </View>
       {showScores ? (
         <View
@@ -214,6 +221,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  seriesHeadline: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 2,
   },
   previousScoreRow: {
     flexDirection: 'row',

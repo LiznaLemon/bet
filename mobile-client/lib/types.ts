@@ -23,6 +23,10 @@ export type ScheduleGame = {
   /** Context about yesterday's game for back-to-back teams. */
   homeB2BContext?: B2BContext;
   awayB2BContext?: B2BContext;
+  /** Series context from ESPN (e.g. "NBA Finals - Game 1", "First Round - Game 3 - If Necessary"). Playoff games only. */
+  seriesHeadline?: string | null;
+  /** ESPN season type: 2 = regular season, 3 = playoffs. */
+  seasonType?: number | null;
 };
 
 export type B2BContext = {

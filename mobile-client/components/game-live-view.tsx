@@ -1,6 +1,7 @@
 import { FilterOptionButtons } from '@/components/filter-option-buttons';
 import { GameMatchupDisplay } from '@/components/game-matchup-display';
 import { InsightCarousel } from '@/components/insight-carousel';
+import { PlayByPlayTimeline } from '@/components/play-by-play-timeline';
 import { PlayerAvatar } from '@/components/player-avatar';
 // import { PropProgressLine } from '@/components/prop-progress-line';
 import { RiveProgressBar } from '@/components/rive-progress-bar';
@@ -43,12 +44,10 @@ import {
   isQuarterEndedAtPlayIndex,
 } from '@/lib/utils/live-stats';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -150,8 +149,11 @@ export function GameLiveView({
     const playerByAthlete = new Map(playersForTeams.map((p) => [p.athlete_id, p]));
     for (const b of boxScores) {
       const enhanced = playerByAthlete.get(b.athlete_id);
+      const boxHs = b.athlete_headshot_href?.trim();
+      const rpcHs = enhanced?.athlete_headshot_href?.trim();
       map.set(b.athlete_id, {
         ...b,
+        athlete_headshot_href: boxHs || rpcHs || '',
         game_log: (enhanced?.game_log ?? []) as unknown[],
       });
     }
@@ -350,31 +352,11 @@ export function GameLiveView({
     (game.completed ?? false) ||
     (!isLiveMode && allPlays.length > 0 && playIndex >= allPlays.length - 1);
 
-  const playsForFeed = useMemo(() => allPlays.slice(-30), [allPlays]);
-
-  const playsForReplayFeed = useMemo(() => {
-    if (allPlays.length === 0) return [];
-    const end = Math.min(playIndex + 1, allPlays.length);
-    const start = Math.max(0, end - 30);
-    return allPlays.slice(start, end);
-  }, [allPlays, playIndex]);
-
-  const playByPlayListRef = useRef<FlatList<(typeof allPlays)[0]>>(null);
-
-  useEffect(() => {
-    if (!isLiveMode && playIndex > 0 && playsForReplayFeed.length > 0) {
-      const t = setTimeout(() => {
-        playByPlayListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
-      return () => clearTimeout(t);
-    }
-  }, [isLiveMode, playIndex, playsForReplayFeed.length]);
-
   if (playsLoading && allPlays.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <ThemedText style={[styles.loadingText, { color: colors.secondaryText }]}>
+        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
           Loading game data...
         </ThemedText>
       </View>
@@ -399,6 +381,7 @@ export function GameLiveView({
               }}
               colorScheme={colorScheme ?? 'light'}
               scheduleGames={scheduleForB2B}
+              scoreLayout="centered"
             />
           </View>
         )}
@@ -407,69 +390,50 @@ export function GameLiveView({
           <View style={[styles.section, styles.playByPlaySection, { borderColor: colors.border }]}>
             <View style={styles.playByPlayHeader}>
               <ThemedText style={styles.sectionTitle}>Play-by-Play</ThemedText>
-              <View style={styles.playByPlayLiveBadge}>
-                <ThemedText style={[styles.playByPlayLiveBadgeText]}>
+              {/* <View
+                style={[
+                  styles.playByPlayLiveBadge,
+                  { backgroundColor: `${colors.statusLive}33` },
+                ]}>
+                <ThemedText
+                  style={[styles.playByPlayLiveBadgeText, { color: colors.statusLive }]}>
                   {isLiveMode
                     ? `LIVE · Q${gameState.period} ${gameState.clockDisplay ?? '—'}`
                     : `Replay · Q${gameState.period} ${gameState.clockDisplay ?? '—'}`}
                 </ThemedText>
-              </View>
+              </View> */}
             </View>
-            <View style={[styles.playByPlayScrollWrap, { height: 180 }]}>
-              <FlatList
-                ref={playByPlayListRef}
-                data={isLiveMode ? playsForFeed : playsForReplayFeed}
-                keyExtractor={(item) => `play-${item.id}-${item.game_play_number}`}
-                inverted
-                scrollEventThrottle={16}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => {
-                  const displayText = getPlayDescriptionWithActor(item as PlayByPlayRecord & { play_text?: string });
-                  return (
-                    <View style={[styles.playByPlayRow, { borderBottomColor: colors.border }]}>
-                      <ThemedText style={[styles.playByPlayMeta, { color: colors.secondaryText }]}>
-                        Q{item.period_number} {item.clock_display_value ?? '—'}
-                        {item.scoring_play && item.score_value != null && (
-                          <ThemedText style={{ color: colors.tint }}> · +{item.score_value}</ThemedText>
-                        )}
-                      </ThemedText>
-                      <ThemedText style={[styles.playByPlayText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-                        {displayText}
-                      </ThemedText>
-                    </View>
-                  );
-                }}
-              />
-              <LinearGradient
-                colors={[colors.background, 'transparent']}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={[styles.playByPlayGradient, styles.playByPlayGradientTop]}
-                pointerEvents="none"
-              />
-              <LinearGradient
-                colors={['transparent', colors.background]}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={[styles.playByPlayGradient, styles.playByPlayGradientBottom]}
-                pointerEvents="none"
-              />
-            </View>
+            <PlayByPlayTimeline
+              plays={allPlays}
+              playIndex={playIndex}
+              onPlayIndexChange={setPlayIndex}
+              clockDisplay={gameState.clockDisplay}
+              colorScheme={colorScheme ?? 'light'}
+              getPlayDescriptionWithActor={getPlayDescriptionWithActor}
+              playerMap={playerMap}
+              athleteToTeam={athleteToTeam}
+              awayTeamAbbrev={game.awayTeamAbbrev ?? ''}
+              homeTeamAbbrev={game.homeTeamAbbrev ?? ''}
+              isLiveMode={!!isLiveMode}
+            />
           </View>
         )}
 
         <View style={[styles.section, { borderColor: colors.border }]}>
-          <ThemedText style={styles.sectionTitle}>Props</ThemedText>
-          <Pressable
-            style={[styles.addPropButton, { backgroundColor: '#ffffff' }]}
-            onPress={() => router.push(`/game/${game.id}/select-props` as const)}>
-            <ThemedText style={[styles.addPropButtonText, { color: '#000000' }]}>
-              Add Prop
-            </ThemedText>
-          </Pressable>
+          <View style={styles.propsSectionHeader}>
+            <ThemedText style={[styles.sectionTitle, styles.sectionTitleInRow]}>Props</ThemedText>
+            <Pressable
+              style={[styles.addPropButton, { backgroundColor: colors.cardBackground }]}
+              onPress={() => router.push(`/game/${game.id}/select-props` as const)}>
+              <MaterialIcons name="add" size={20} color={colors.text} />
+              <ThemedText style={[styles.addPropButtonText, { color: colors.text }]}>
+                Add Prop
+              </ThemedText>
+            </Pressable>
+          </View>
           <View style={styles.propsList}>
             {props.length === 0 ? (
-              <ThemedText style={[styles.emptyState, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.emptyState, { color: colors.textSecondary }]}>
                 Add a prop to see live likelihood insights.
               </ThemedText>
             ) : (
@@ -501,7 +465,7 @@ export function GameLiveView({
         <View style={[styles.section, { borderColor: colors.border }]}>
           <ThemedText style={styles.sectionTitle}>Live stats</ThemedText>
           {allPlays.length === 0 ? (
-            <ThemedText style={[styles.emptyState, { color: colors.secondaryText }]}>
+            <ThemedText style={[styles.emptyState, { color: colors.textSecondary }]}>
               No play-by-play data for this game.
             </ThemedText>
           ) : (
@@ -545,12 +509,12 @@ export function GameLiveView({
                               {player.athlete_display_name}
                             </ThemedText>
                             {isOnCourt && (
-                              <View style={styles.onCourtBadge}>
-                                <ThemedText style={styles.onCourtBadgeText}>On court</ThemedText>
+                              <View style={[styles.onCourtBadge, { borderColor: colors.border }]}>
+                                <ThemedText style={[styles.onCourtBadgeText, { color: colors.scoreWinner }]}>On court</ThemedText>
                               </View>
                             )}
                           </View>
-                          <ThemedText style={[styles.statLine, { color: colors.secondaryText }]}>
+                          <ThemedText style={[styles.statLine, { color: colors.textSecondary }]}>
                             {liveStats?.points ?? 0} PTS · {liveStats?.rebounds ?? 0} REB · {liveStats?.assists ?? 0} AST
                           </ThemedText>
                         </View>
@@ -594,19 +558,6 @@ export function GameLiveView({
             {' / '}
             {allPlays.length || 1}
           </ThemedText>
-          {allPlays.length > 0 && playIndex >= 0 && allPlays[playIndex] && (
-            <View style={[styles.progressPlayDescription, { borderBottomColor: colors.border }]}>
-              <ThemedText style={[styles.playByPlayMeta, { color: colors.secondaryText }]}>
-                Q{allPlays[playIndex].period_number} {allPlays[playIndex].clock_display_value ?? '—'}
-                {allPlays[playIndex].scoring_play && allPlays[playIndex].score_value != null && (
-                  <ThemedText style={{ color: colors.tint }}> · +{allPlays[playIndex].score_value}</ThemedText>
-                )}
-              </ThemedText>
-              <ThemedText style={[styles.playByPlayText, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-                {getPlayDescriptionWithActor(allPlays[playIndex] as PlayByPlayRecord & { play_text?: string })}
-              </ThemedText>
-            </View>
-          )}
           <View style={styles.progressRow2}>
             <Pressable
               style={({ pressed }) => [
@@ -640,7 +591,7 @@ export function GameLiveView({
                   onPress={() => setPlayIndex((i) => Math.max(0, i + delta))}
                   disabled={isDisabled}>
                   <ThemedText
-                    style={[styles.stepBtnText, { color: isDisabled ? colors.secondaryText : colors.tint }]}>
+                    style={[styles.stepBtnText, { color: isDisabled ? colors.textSecondary : colors.tint }]}>
                     {delta}
                   </ThemedText>
                 </Pressable>
@@ -662,8 +613,8 @@ export function GameLiveView({
                 setIsAutoplay((v) => !v);
               }}
               disabled={allPlays.length === 0}>
-              <MaterialIcons name={isAutoplay ? 'pause' : 'play-arrow'} size={18} color={isAutoplay ? colors.tint : colors.secondaryText} />
-              <ThemedText style={[styles.autoplayLabel, { color: isAutoplay ? colors.tint : colors.secondaryText }]}>
+              <MaterialIcons name={isAutoplay ? 'pause' : 'play-arrow'} size={18} color={isAutoplay ? colors.tint : colors.textSecondary} />
+              <ThemedText style={[styles.autoplayLabel, { color: isAutoplay ? colors.tint : colors.textSecondary }]}>
                 {isAutoplay ? 'Pause' : 'Play'}
               </ThemedText>
             </Pressable>
@@ -686,7 +637,7 @@ export function GameLiveView({
                   onPress={() => setPlayIndex((i) => Math.min(maxPlayIndex, i + delta))}
                   disabled={isDisabled}>
                   <ThemedText
-                    style={[styles.stepBtnText, { color: isDisabled ? colors.secondaryText : colors.tint }]}>
+                    style={[styles.stepBtnText, { color: isDisabled ? colors.textSecondary : colors.tint }]}>
                     +{delta}
                   </ThemedText>
                 </Pressable>
@@ -708,7 +659,7 @@ export function GameLiveView({
           </View>
           <View style={[styles.progressRow3, { borderTopColor: colors.border }]}>
             <View style={styles.intervalRow}>
-              <ThemedText style={[styles.intervalLabel, { color: colors.secondaryText }]}>Auto-play interval:</ThemedText>
+              <ThemedText style={[styles.intervalLabel, { color: colors.textSecondary }]}>Auto-play interval:</ThemedText>
               {[3, 5, 10, 15, 30].map((sec) => {
                 const isActive = autoplayIntervalSec === sec;
                 return (
@@ -724,7 +675,7 @@ export function GameLiveView({
                     ]}
                     onPress={() => setAutoplayIntervalSec(sec)}
                     disabled={allPlays.length === 0}>
-                    <ThemedText style={[styles.intervalBtnText, { color: isActive ? colors.tint : colors.secondaryText }]}>
+                    <ThemedText style={[styles.intervalBtnText, { color: isActive ? colors.tint : colors.textSecondary }]}>
                       {sec}s
                     </ThemedText>
                   </Pressable>
@@ -972,7 +923,7 @@ function LivePropCard({
                 style={[
                   styles.hitMissBadge,
                   {
-                    backgroundColor: isHit ? '#24d169' : '#e53935',
+                    backgroundColor: isHit ? colors.scoreWinner : colors.statusLive,
                   },
                 ]}>
                 <MaterialIcons
@@ -987,12 +938,12 @@ function LivePropCard({
             <View style={styles.propPlayerNameRow}>
               <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
               {isOnCourt && (
-                <View style={styles.onCourtBadge}>
-                  <ThemedText style={styles.onCourtBadgeText}>On court</ThemedText>
+                <View style={[styles.onCourtBadge, { borderColor: colors.border }]}>
+                  <ThemedText style={[styles.onCourtBadgeText, { color: colors.scoreWinner }]}>On court</ThemedText>
                 </View>
               )}
             </View>
-            <ThemedText style={[styles.propDesc, { color: colors.secondaryText }]}>
+            <ThemedText style={[styles.propDesc, { color: colors.textSecondary }]}>
               {formatPropDescription(prop)}
             </ThemedText>
           </View>
@@ -1065,7 +1016,7 @@ function LivePropCard({
                         <View style={styles.quarterAvgsCompactQuarters}>
                           {[1, 2, 3, 4].map((q) => (
                             <View key={q} style={styles.quarterAvgsCompactCell}>
-                              <ThemedText style={[styles.quarterAvgsCompactQ, { color: colors.secondaryText }]}>
+                              <ThemedText style={[styles.quarterAvgsCompactQ, { color: colors.textSecondary }]}>
                                 Q{q}
                               </ThemedText>
                             </View>
@@ -1074,7 +1025,7 @@ function LivePropCard({
                       </View>
                       <View style={styles.quarterAvgsCompactRow}>
                         <View style={styles.quarterAvgsCompactLabelCol}>
-                          <ThemedText style={[styles.quarterAvgsCompactLabel, { color: colors.secondaryText }]}>
+                          <ThemedText style={[styles.quarterAvgsCompactLabel, { color: colors.textSecondary }]}>
                             Average{!quarterAvgs ? ' (est.)' : ''}
                           </ThemedText>
                         </View>
@@ -1090,7 +1041,7 @@ function LivePropCard({
                       </View>
                       <View style={styles.quarterAvgsCompactRow}>
                         <View style={styles.quarterAvgsCompactLabelCol}>
-                          <ThemedText style={[styles.quarterAvgsCompactLabel, { color: colors.secondaryText }]}>
+                          <ThemedText style={[styles.quarterAvgsCompactLabel, { color: colors.textSecondary }]}>
                             Today
                           </ThemedText>
                         </View>
@@ -1101,7 +1052,7 @@ function LivePropCard({
                                 <ThemedText
                                   style={[
                                     styles.quarterAvgsCompactVal,
-                                    { color: hasData ? colors.text : colors.secondaryText },
+                                    { color: hasData ? colors.text : colors.textSecondary },
                                   ]}>
                                   {displayValue}
                                 </ThemedText>
@@ -1109,7 +1060,7 @@ function LivePropCard({
                                   <ThemedText
                                     style={[
                                       styles.quarterAvgsCompactDelta,
-                                      { color: delta >= 0 ? '#24d169' : '#e53935' },
+                                      { color: delta >= 0 ? colors.scoreWinner : colors.statusLive },
                                     ]}>
                                     {' '}
                                     {delta >= 0 ? '+' : ''}{delta.toFixed(1)}
@@ -1141,7 +1092,7 @@ function LivePropCard({
       )}
 
       {!isSingleProp(prop) && (
-        <ThemedText style={[styles.insightText, { color: colors.secondaryText }]}>
+        <ThemedText style={[styles.insightText, { color: colors.textSecondary }]}>
           Double-double / triple-double live insights coming soon.
         </ThemedText>
       )}
@@ -1181,6 +1132,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  sectionTitleInRow: {
+    marginBottom: 0,
+    flexShrink: 1,
+  },
+  propsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
   floatingProgress: {
     position: 'absolute',
     bottom: 0,
@@ -1195,11 +1157,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-  },
-  progressPlayDescription: {
-    paddingVertical: 8,
-    paddingHorizontal: 0,
-    marginBottom: 4,
   },
   progressRow2: {
     flexDirection: 'row',
@@ -1297,8 +1254,6 @@ const styles = StyleSheet.create({
   },
   onCourtBadge: {
     borderWidth: 1,
-    borderColor: '#373737',
-    // backgroundColor: '#24d16940',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -1306,8 +1261,6 @@ const styles = StyleSheet.create({
   onCourtBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#24d169',
-    // color: '#fff',
   },
   statLine: {
     fontSize: 13,
@@ -1422,11 +1375,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addPropButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderRadius: 8,
-    alignSelf: 'flex-end',
-    marginBottom: 12,
+    flexShrink: 0,
   },
   addPropButtonText: {
     fontSize: 15,
@@ -1436,44 +1391,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    // borderWidth: 1,
-    // // borderColor: '#373737',
-    backgroundColor: '#e5393580',
   },
   playByPlayLiveBadgeText: {
     fontSize: 14,
-    // fontWeight: '600',
-    // color: '#e53935',
-  },
-  playByPlayScrollWrap: {
-    overflow: 'hidden',
-    borderRadius: 8,
-    position: 'relative',
-  },
-  playByPlayRow: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-  },
-  playByPlayMeta: {
-    fontSize: 11,
     fontWeight: '600',
-    marginBottom: 2,
-  },
-  playByPlayText: {
-    fontSize: 13,
-  },
-  playByPlayGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 28,
-    pointerEvents: 'none',
-  },
-  playByPlayGradientTop: {
-    top: 0,
-  },
-  playByPlayGradientBottom: {
-    bottom: 0,
   },
 });

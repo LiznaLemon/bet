@@ -101,9 +101,6 @@ export function UnderlineTabBar<K extends string>({
                       fontSize: labelFontSize,
                       fontWeight: labelFontWeight,
                       color: active ? activeColor : inactiveColor,
-                      // borderWidth: 1,
-                      // borderColor: 'red',
-                      marginBottom: 8,
                     },
                     slotStyles?.label,
                   ]}>
@@ -152,6 +149,7 @@ const sheet = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 8,
   },
   label: {
     textAlign: 'center',

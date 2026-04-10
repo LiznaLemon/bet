@@ -10,7 +10,7 @@ import {
 } from '@/components/team-comparison-bar';
 import { ThemedText } from '@/components/themed-text';
 import { getTeamColor } from '@/constants/team-colors';
-import { Colors } from '@/constants/theme';
+import { Colors, gradientFadeClear } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import {
@@ -194,23 +194,17 @@ type GameMatchupViewProps = {
 const MARQUEE_PX_PER_MS = 0.05; // scroll speed
 const MARQUEE_FADE = 32;
 
-function injuryStatusColor(status: string, secondaryText: string): string {
+function injuryStatusColor(status: string, textSecondary: string, statusLive: string): string {
   const s = status.toLowerCase();
-  if (s.includes('out')) return '#e53935';
+  if (s.includes('out')) return statusLive;
   if (s.includes('day') || s === 'dtd') return '#ff9800';
   if (s.includes('quest')) return '#ffc107';
-  return secondaryText;
+  return textSecondary;
 }
 
-function InjuryMarquee({
-  injuries,
-  bgColor,
-  secondaryText,
-}: {
-  injuries: ESPNInjuryEntry[];
-  bgColor: string;
-  secondaryText: string;
-}) {
+function InjuryMarquee({ injuries }: { injuries: ESPNInjuryEntry[] }) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const translateX = useRef(new Animated.Value(0)).current;
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const [singleWidth, setSingleWidth] = useState(0);
@@ -236,13 +230,18 @@ function InjuryMarquee({
       <PlayerAvatar uri={inj.headshotUrl} size={36} />
       <View style={marqueeStyles.meta}>
         <Text style={marqueeStyles.name} numberOfLines={1}>
-          {inj.playerName}
+          <Text style={{ color: colors.text }}>{inj.playerName}</Text>
           {inj.teamAbbrev ? (
-            <Text style={[marqueeStyles.name, marqueeStyles.teamAbbrev]}>{` (${inj.teamAbbrev})`}</Text>
+            <Text style={[marqueeStyles.name, marqueeStyles.teamAbbrev, { color: colors.textSecondary }]}>
+              {` (${inj.teamAbbrev})`}
+            </Text>
           ) : null}
         </Text>
         <Text
-          style={[marqueeStyles.status, { color: injuryStatusColor(inj.status, secondaryText) }]}
+          style={[
+            marqueeStyles.status,
+            { color: injuryStatusColor(inj.status, colors.textSecondary, colors.statusLive) },
+          ]}
           numberOfLines={1}>
           {inj.status}
         </Text>
@@ -263,14 +262,14 @@ function InjuryMarquee({
         {injuries.map((inj, i) => renderItem(inj, `b-${i}`))}
       </Animated.View>
       <LinearGradient
-        colors={[bgColor, 'transparent']}
+        colors={[colors.background, gradientFadeClear(colors.background)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[marqueeStyles.fade, marqueeStyles.fadeLeft]}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['transparent', bgColor]}
+        colors={[gradientFadeClear(colors.background), colors.background]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[marqueeStyles.fade, marqueeStyles.fadeRight]}
@@ -305,12 +304,10 @@ const marqueeStyles = StyleSheet.create({
   name: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
   },
   teamAbbrev: {
     fontSize: 13,
     fontWeight: '400',
-    opacity: 0.6,
   },
   status: {
     fontSize: 12,
@@ -1336,7 +1333,7 @@ export function GameMatchupView({
         sidelinedStatLeaderLines={sidelinedStatLeaderLines}
         seasonSeriesSummaryText={seasonSeriesSummaryText}
         textColor={colors.text}
-        mutedColor={colors.secondaryText}
+        mutedColor={colors.textSecondary}
         avatarBgColor={colors.border}
         isLoading={summaryLoading}
       />
@@ -1376,17 +1373,13 @@ export function GameMatchupView({
         return (
           <View style={styles.sectionOpen}>
             <ThemedText style={styles.sectionTitle}>Injury Report</ThemedText>
-            <InjuryMarquee
-              injuries={allInjuries}
-              bgColor={colors.background}
-              secondaryText={colors.secondaryText}
-            />
+            <InjuryMarquee injuries={allInjuries} />
             {injurySnapshotLabel ? (
-              <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.dataFreshness, { color: colors.textSecondary }]}>
                 Injury report as of {injurySnapshotLabel}
               </ThemedText>
             ) : liveDataAsOfLabel ? (
-              <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.dataFreshness, { color: colors.textSecondary }]}>
                 Injury report and live data as of {liveDataAsOfLabel}
               </ThemedText>
             ) : null}
@@ -1396,7 +1389,7 @@ export function GameMatchupView({
 
       {!injuries.length && (liveDataAsOfLabel || injurySnapshotLabel) ? (
         <View style={styles.sectionOpen}>
-          <ThemedText style={[styles.dataFreshness, { color: colors.secondaryText }]}>
+          <ThemedText style={[styles.dataFreshness, { color: colors.textSecondary }]}>
             {liveDataAsOfLabel ? `Live data as of ${liveDataAsOfLabel}` : `No injury report recorded`}
           </ThemedText>
         </View>
@@ -1440,7 +1433,7 @@ export function GameMatchupView({
               }
               const avg = getSeasonAvgFromGameLog(gamesVs, keyMatchupStat);
               const statStr = `${avg.toFixed(1)} ${PROP_STAT_PLAYER_ROW_LABEL[keyMatchupStat]}`;
-              return { prefix: 'Average of ', statStr, suffix: ` in ${gamesVs.length} games vs ${opp}` };
+              return { prefix: 'Avg. ', statStr, suffix: ` in ${gamesVs.length} games vs ${opp}` };
             })();
             return (
               <View key={p.athlete_id} style={styles.matchupRow}>
@@ -1451,7 +1444,7 @@ export function GameMatchupView({
                   <View style={styles.playerMeta}>
                     <ThemedText style={styles.playerName}>
                       {p.athlete_display_name}
-                      <ThemedText style={[styles.playerTeamAbbrev, { color: colors.secondaryText }]}>
+                      <ThemedText style={[styles.playerTeamAbbrev, { color: colors.textSecondary }]}>
                         {' '}({toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase())})
                       </ThemedText>
                     </ThemedText>
@@ -1489,7 +1482,7 @@ export function GameMatchupView({
                           : null;
                         return (
                           <>
-                            <ThemedText style={[styles.playerStat, { color: colors.secondaryText }]}>
+                            <ThemedText style={[styles.playerStat, { color: colors.textSecondary }]}>
                               {primaryVal}
                               {rank != null && rank <= 25 && (
                                 <Text style={{ color: colors.text, fontWeight: '700' }}>{` (#${rank})`}</Text>
@@ -1497,18 +1490,18 @@ export function GameMatchupView({
                               {rest ? ` • ${rest}` : ''}
                             </ThemedText>
                             {(vsLineParts || trendParts) && (
-                              <ThemedText style={[styles.vsLine, { color: colors.secondaryText }]}>
+                              <ThemedText style={[styles.vsLine, { color: colors.textSecondary }]}>
                                 {vsLineParts && (
                                   <>
                                     {vsLineParts.prefix}
-                                    <Text style={{ color: colors.text }}>{vsLineParts.statStr}</Text>
+                                    <Text style={{ color: colors.text, fontWeight: 'bold' }}>{vsLineParts.statStr}</Text>
                                     {vsLineParts.suffix}
                                   </>
                                 )}
                                 {vsLineParts && trendParts ? '. ' : null}
                                 {trendParts && (
                                   <>
-                                    <Text style={{ color: trendParts.isPositive ? '#22c55e' : '#ef4444' }}>{trendParts.deltaStr}</Text>
+                                    <Text style={{ color: trendParts.isPositive ? colors.scoreWinner : colors.statusLive, fontWeight: 'bold' }}>{trendParts.deltaStr}</Text>
                                     {trendParts.rest}
                                   </>
                                 )}
@@ -1555,7 +1548,7 @@ export function GameMatchupView({
         <View style={styles.sectionOpen}>
           <ThemedText style={styles.sectionTitle}>Previous Matchups</ThemedText>
           {seasonSeriesSummaryText ? (
-            <ThemedText style={[styles.seriesLine, { color: colors.secondaryText }]}>
+            <ThemedText style={[styles.seriesLine, { color: colors.textSecondary }]}>
               {seasonSeriesSummaryText}
             </ThemedText>
           ) : null}
@@ -1593,51 +1586,33 @@ export function GameMatchupView({
                 <>
                   <View style={styles.previousScoreRow}>
                     <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-                      {previousScoreDisplay.leftWon || previousScoreDisplay.isTie ? (
-                        <ThemedText
-                          style={[styles.previousScoreText, previousScoreDisplay.leftWon && { color: '#24d169' }]}
-                          numberOfLines={1}>
-                          {previousScoreDisplay.leftScore}
-                        </ThemedText>
-                      ) : (
-                        <View style={styles.previousScoreOutlineWrap}>
-                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
-                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                              {previousScoreDisplay.leftScore}
-                            </Text>
-                          ))}
-                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                            {previousScoreDisplay.leftScore}
-                          </ThemedText>
-                        </View>
-                      )}
-                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Away</ThemedText>
-                      <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
+                      <ThemedText
+                        style={[
+                          styles.previousScoreText,
+                          previousScoreDisplay.leftWon && { color: colors.scoreWinner },
+                          !previousScoreDisplay.leftWon && !previousScoreDisplay.isTie && { color: colors.scoreLoser },
+                        ]}
+                        numberOfLines={1}>
+                        {previousScoreDisplay.leftScore}
+                      </ThemedText>
+                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.textSecondary }]}>Away</ThemedText>
+                      <ThemedText style={[styles.previousScoreTeamName, { color: colors.scoreTeamLabel }]}>
                         {displayAwayAbbrev}
                       </ThemedText>
                     </View>
-                    <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+                    <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.textSecondary }]}>–</ThemedText>
                     <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-                      {previousScoreDisplay.rightWon || previousScoreDisplay.isTie ? (
-                        <ThemedText
-                          style={[styles.previousScoreText, previousScoreDisplay.rightWon && { color: '#24d169' }]}
-                          numberOfLines={1}>
-                          {previousScoreDisplay.rightScore}
-                        </ThemedText>
-                      ) : (
-                        <View style={styles.previousScoreOutlineWrap}>
-                          {[[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([dx, dy]) => (
-                            <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                              {previousScoreDisplay.rightScore}
-                            </Text>
-                          ))}
-                          <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                            {previousScoreDisplay.rightScore}
-                          </ThemedText>
-                        </View>
-                      )}
-                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.secondaryText }]}>Home</ThemedText>
-                      <ThemedText style={[styles.teamAbbrev, styles.previousScoreTeamName, { color: '#ffffff' }]}>
+                      <ThemedText
+                        style={[
+                          styles.previousScoreText,
+                          previousScoreDisplay.rightWon && { color: colors.scoreWinner },
+                          !previousScoreDisplay.rightWon && !previousScoreDisplay.isTie && { color: colors.scoreLoser },
+                        ]}
+                        numberOfLines={1}>
+                        {previousScoreDisplay.rightScore}
+                      </ThemedText>
+                      <ThemedText style={[styles.previousScoreHomeAway, { color: colors.textSecondary }]}>Home</ThemedText>
+                      <ThemedText style={[styles.teamAbbrev, styles.previousScoreTeamName, { color: colors.scoreTeamLabel }]}>
                         {displayHomeAbbrev}
                       </ThemedText>
                     </View>
@@ -1661,7 +1636,7 @@ export function GameMatchupView({
                 previousBoxScoresLoading ? (
                   <View style={styles.loadingPlaceholder}>
                     <ActivityIndicator size="small" color={colors.tint} />
-                    <ThemedText style={[styles.breakdownLoadingText, { color: colors.secondaryText }]}>
+                    <ThemedText style={[styles.breakdownLoadingText, { color: colors.textSecondary }]}>
                       Loading game stats…
                     </ThemedText>
                   </View>
@@ -1786,7 +1761,7 @@ export function GameMatchupView({
                     style={[
                       styles.previousScoreHomeAway,
                       styles.breakdownTeamHeaderAwayText,
-                      { color: colors.secondaryText },
+                      { color: colors.textSecondary },
                     ]}>
                     Away
                   </ThemedText>
@@ -1795,7 +1770,7 @@ export function GameMatchupView({
                       styles.teamAbbrev,
                       styles.previousScoreTeamName,
                       styles.breakdownTeamHeaderAwayText,
-                      { color: '#ffffff' },
+                      { color: colors.scoreTeamLabel },
                     ]}>
                     {displayAwayAbbrev}
                   </ThemedText>
@@ -1809,7 +1784,7 @@ export function GameMatchupView({
                     style={[
                       styles.previousScoreHomeAway,
                       styles.breakdownTeamHeaderHomeText,
-                      { color: colors.secondaryText },
+                      { color: colors.textSecondary },
                     ]}>
                     Home
                   </ThemedText>
@@ -1818,7 +1793,7 @@ export function GameMatchupView({
                       styles.teamAbbrev,
                       styles.previousScoreTeamName,
                       styles.breakdownTeamHeaderHomeText,
-                      { color: '#ffffff' },
+                      { color: colors.scoreTeamLabel },
                     ]}>
                     {displayHomeAbbrev}
                   </ThemedText>
@@ -2013,14 +1988,14 @@ export function GameMatchupView({
           ) : (breakdownStatType === 'offense' && breakdownUnavailable) ||
             (breakdownStatType === 'defense' && breakdownDefenseUnavailable) ? (
             <View style={styles.loadingPlaceholder}>
-              <ThemedText style={[styles.breakdownLoadingText, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.breakdownLoadingText, { color: colors.textSecondary }]}>
                 Team stats unavailable.
               </ThemedText>
             </View>
           ) : (
             <View style={styles.loadingPlaceholder}>
               <ActivityIndicator size="small" color={colors.tint} />
-              <ThemedText style={[styles.breakdownLoadingText, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.breakdownLoadingText, { color: colors.textSecondary }]}>
                 Loading team stats…
               </ThemedText>
             </View>
@@ -2090,20 +2065,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     minWidth: 48,
     lineHeight: 48,
-  },
-  previousScoreOutlineWrap: {
-    position: 'relative',
-  },
-  previousScoreOutlineStroke: {
-    position: 'absolute',
-    color: '#939393',
-    fontSize: 40,
-    fontWeight: '700',
-    minWidth: 48,
-    lineHeight: 48,
-  },
-  previousScoreOutlineFill: {
-    position: 'relative',
+    textAlign: 'center',
   },
   previousScoreDash: {
     fontSize: 32,
@@ -2139,7 +2101,6 @@ const styles = StyleSheet.create({
   sidelinedStatLeaderEmoji: {
     fontSize: 12,
     lineHeight: 18,
-    backgroundColor: '#e5393550',
     borderRadius: 100,
     padding: 8
   },

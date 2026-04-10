@@ -1,11 +1,13 @@
+import { Colors } from '@/constants/theme';
 import {
   Fit,
+  RiveColor,
   RiveView,
   useRive,
   useRiveFile,
   useViewModelInstance,
 } from '@rive-app/react-native';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 export type RiveProgressBarProps = {
@@ -30,11 +32,17 @@ export const RiveProgressBar = memo(function RiveProgressBar({
   projectedValue,
   averageProjectedValue,
   changeInValue = '',
+  colorScheme,
 }: RiveProgressBarProps) {
   const { riveFile, isLoading, error } = useRiveFile(RIVE_PROGRESS_BAR_PATH);
   const viewModelInstance = useViewModelInstance(riveFile);
   const { riveViewRef, setHybridRef } = useRive();
   const rafRef = useRef<number | null>(null);
+
+  const barBackgroundHex = useMemo(
+    () => Colors[colorScheme].chartBackground,
+    [colorScheme]
+  );
 
   useEffect(() => {
     if (!viewModelInstance) return;
@@ -55,6 +63,11 @@ export const RiveProgressBar = memo(function RiveProgressBar({
 
     const changeLabelProp = viewModelInstance.stringProperty('changeInValue');
     if (changeLabelProp) changeLabelProp.value = changeInValue;
+
+    const barBgProp = viewModelInstance.colorProperty('barBackgroundColor');
+    if (barBgProp) {
+      barBgProp.value = RiveColor.fromHexString(barBackgroundHex).toInt();
+    }
 
     // Force the state machine to advance so data binding updates are rendered.
     // State machines can "settle" when idle; playIfNeeded unsettles them.
@@ -82,6 +95,7 @@ export const RiveProgressBar = memo(function RiveProgressBar({
     projectedValue,
     averageProjectedValue,
     changeInValue,
+    barBackgroundHex,
     riveViewRef,
   ]);
 

@@ -258,7 +258,7 @@ export const PropProgressLine = memo(function PropProgressLine({
                   opacity: fadedOpacity,
                 },
               ]}>
-              <ThemedText style={[styles.labelLeft, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.labelLeft, { color: colors.textSecondary }]}>
                 {Math.round(line).toString()}
               </ThemedText>
             </View>
@@ -323,29 +323,29 @@ export const PropProgressLine = memo(function PropProgressLine({
       </View>
       {/* Bottom: 0 label */}
       <View style={[styles.labelsRow, { position: 'relative' }]}>
-        <ThemedText style={[styles.labelLeft, { color: colors.secondaryText }]}>
+        <ThemedText style={[styles.labelLeft, { color: colors.textSecondary }]}>
           0
         </ThemedText>
       </View>
       <View style={[styles.legend, { borderColor: colors.border }]}>
         <View style={styles.legendRow}>
           <View style={[styles.legendDot, { backgroundColor: colors.cardBackground, borderColor: colors.border }]} />
-          <ThemedText style={[styles.legendText, { color: colors.secondaryText }]}>Current</ThemedText>
+          <ThemedText style={[styles.legendText, { color: colors.textSecondary }]}>Current</ThemedText>
         </View>
         <View style={styles.legendRow}>
           <View style={styles.legendTickTarget} />
-          <ThemedText style={[styles.legendText, { color: colors.secondaryText }]}>Target</ThemedText>
+          <ThemedText style={[styles.legendText, { color: colors.textSecondary }]}>Target</ThemedText>
         </View>
         {averageProjectedValue != null && (
           <View style={styles.legendRow}>
             <View style={styles.legendTickAverageProjected} />
-            <ThemedText style={[styles.legendText, { color: colors.secondaryText }]}>Avg proj</ThemedText>
+            <ThemedText style={[styles.legendText, { color: colors.textSecondary }]}>Avg proj</ThemedText>
           </View>
         )}
         {projectedValue != null && (
           <View style={styles.legendRow}>
             <View style={styles.legendTickProjected} />
-            <ThemedText style={[styles.legendText, { color: colors.secondaryText }]}>On pace</ThemedText>
+            <ThemedText style={[styles.legendText, { color: colors.textSecondary }]}>On pace</ThemedText>
           </View>
         )}
       </View>

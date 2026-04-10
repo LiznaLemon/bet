@@ -18,7 +18,7 @@ export function ErrorState({
 
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.message, { color: colors.secondaryText }]}>
+      <ThemedText style={[styles.message, { color: colors.textSecondary }]}>
         {message}
       </ThemedText>
       {onRetry && (

@@ -1,5 +1,5 @@
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Colors, gradientFadeClear } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -33,7 +33,6 @@ export function FilterOptionButtons({
   scrollable = false,
 }: FilterOptionButtonsProps) {
   const colors = Colors[colorScheme];
-  const backgroundColor = colors.background;
   const scrollRef = useRef<ScrollView>(null);
   const layoutRef = useRef<Record<string, { x: number; width: number }>>({});
   const scrollViewWidthRef = useRef(0);
@@ -69,6 +68,7 @@ export function FilterOptionButtons({
             key={option.key}
             onLayout={(e) => handleButtonLayout(option.key, e)}
             collapsable={false}
+            style={styles.buttonWrapper}
           >
             <Pressable
               onPress={() => onSelect(option.key)}
@@ -77,11 +77,11 @@ export function FilterOptionButtons({
                 {
                   backgroundColor: isActive ? colors.cardBackground : 'transparent',
                   opacity: pressed ? 0.7 : 1,
-                  borderWidth: 1,
-                  borderColor: isActive ? colors.tint : Colors[colorScheme ?? 'light'].border,
+                  borderWidth: isActive ? 2 : 1,
+                  borderColor: isActive ? colors.tint : colors.border,
                 },
               ]}>
-              <ThemedText style={[styles.buttonText, { color: isActive ? colors.tint : Colors[colorScheme ?? 'light'].secondaryText }]}>
+              <ThemedText style={[styles.buttonText, { color: isActive ? colors.textPrimary : colors.tint }]}>
                 {option.label}
               </ThemedText>
             </Pressable>
@@ -110,14 +110,14 @@ export function FilterOptionButtons({
         {buttons}
       </ScrollView>
       <LinearGradient
-        colors={[backgroundColor, 'transparent']}
+        colors={[colors.fadeEdgeBase, gradientFadeClear(colors.fadeEdgeBase)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.fadeEdge, styles.fadeLeft]}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['transparent', backgroundColor]}
+        colors={[gradientFadeClear(colors.fadeEdgeBase), colors.fadeEdgeBase]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.fadeEdge, styles.fadeRight]}
@@ -130,6 +130,9 @@ export function FilterOptionButtons({
 const styles = StyleSheet.create({
   container: {
     minHeight: 36,
+  },
+  buttonWrapper: {
+    paddingVertical: 4,
   },
   scrollableWrapper: {
     overflow: 'hidden',

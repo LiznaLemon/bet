@@ -88,7 +88,7 @@ export function SimilarPlayersModal({
           pointerEvents="box-none">
           <View style={styles.header}>
             <ThemedText style={styles.title}>Similar Players vs {opponentAbbrev}</ThemedText>
-            <ThemedText style={[styles.subtitle, { color: colors.secondaryText }]}>
+            <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
               Players like {sourcePlayerName}
             </ThemedText>
             <TouchableOpacity
@@ -111,13 +111,13 @@ export function SimilarPlayersModal({
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.tint} />
-                <ThemedText style={[styles.loadingText, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
                   Loading similar players…
                 </ThemedText>
               </View>
             ) : !similarPlayers || similarPlayers.length === 0 ? (
               <View style={styles.loadingContainer}>
-                <ThemedText style={[styles.loadingText, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
                   No similar players found vs {opponentAbbrev}.
                 </ThemedText>
               </View>
@@ -134,18 +134,18 @@ export function SimilarPlayersModal({
                       <ThemedText style={styles.playerName}>
                         {player.athlete_display_name}
                       </ThemedText>
-                      <ThemedText style={[styles.playerTeam, { color: colors.secondaryText }]}>
+                      <ThemedText style={[styles.playerTeam, { color: colors.textSecondary }]}>
                         {player.team_abbreviation} • {gamesVsOpponent.length} game
                         {gamesVsOpponent.length !== 1 ? 's' : ''} vs {opponentAbbrev}
                       </ThemedText>
-                      <ThemedText style={[styles.avgLine, { color: colors.secondaryText }]}>
+                      <ThemedText style={[styles.avgLine, { color: colors.textSecondary }]}>
                         Avg: {avgPts.toFixed(1)} pts, {avgReb.toFixed(1)} reb, {avgAst.toFixed(1)} ast
                       </ThemedText>
                     </View>
                   </View>
 
                   <View style={styles.gamesSection}>
-                    <ThemedText style={[styles.gamesLabel, { color: colors.secondaryText }]}>
+                    <ThemedText style={[styles.gamesLabel, { color: colors.textSecondary }]}>
                       Games
                     </ThemedText>
                     {gamesVsOpponent.map((game) => {
@@ -158,7 +158,7 @@ export function SimilarPlayersModal({
                         <View
                           key={game.game_id ?? game.game_date}
                           style={[styles.gameRow, { borderTopColor: colors.border }]}>
-                          <ThemedText style={[styles.gameDate, { color: colors.secondaryText }]}>
+                          <ThemedText style={[styles.gameDate, { color: colors.textSecondary }]}>
                             {formatDate(game.game_date ?? '')}
                           </ThemedText>
                           <View style={styles.gameStats}>

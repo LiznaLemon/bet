@@ -52,6 +52,7 @@ function GameCard({
     <Pressable
       style={({ pressed }) => [
         styles.gameCard,
+        { borderColor: Colors[colorScheme].dividerSubtle },
         pressed && styles.gameCardPressed,
       ]}
       onPress={() => router.push(`/game/${game.id}`)}>
@@ -112,16 +113,24 @@ export default function ScheduleScreen() {
         </ThemedText>
       </View>
       <View style={styles.monthSection}>
-        <ThemedText style={[styles.monthLabel, { color: colors.secondaryText }]}>
+        <ThemedText style={[styles.monthLabel, { color: colors.textSecondary }]}>
           {formatMonthYear(selectedDate)}
         </ThemedText>
-        {!isToday && (
-          <Pressable
-            onPress={() => setSelectedDate(today)}
-            style={[styles.todayBtn, { borderColor: colors.tint }]}>
-            <ThemedText style={[styles.todayBtnText, { color: colors.tint }]}>Today</ThemedText>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => setSelectedDate(today)}
+          disabled={isToday}
+          accessibilityRole="button"
+          accessibilityLabel="Jump to today"
+          accessibilityState={{ disabled: isToday }}
+          accessibilityElementsHidden={isToday}
+          importantForAccessibility={isToday ? 'no' : 'yes'}
+          style={({ pressed }) => [
+            styles.todayBtn,
+            { borderColor: colors.tint },
+            isToday ? styles.todayBtnHidden : pressed && styles.todayBtnPressed,
+          ]}>
+          <ThemedText style={[styles.todayBtnText, { color: colors.tint }]}>Today</ThemedText>
+        </Pressable>
       </View>
       <ScheduleDateFilter
         selectedDate={selectedDate}
@@ -140,7 +149,7 @@ export default function ScheduleScreen() {
           <Animated.View style={[styles.listArea, { opacity: listOpacity }]}>
             {isError ? (
               <View style={styles.stateContainer}>
-                <ThemedText style={[styles.stateText, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.stateText, { color: colors.textSecondary }]}>
                   Couldn't load schedule
                 </ThemedText>
                 <Pressable onPress={() => void refetch()} style={[styles.retryBtn, { borderColor: colors.tint }]}>
@@ -149,7 +158,7 @@ export default function ScheduleScreen() {
               </View>
             ) : games.length === 0 ? (
               <View style={styles.stateContainer}>
-                <ThemedText style={[styles.stateText, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.stateText, { color: colors.textSecondary }]}>
                   No games scheduled for this day
                 </ThemedText>
               </View>
@@ -216,6 +225,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
+  /** Keeps row height/width stable when viewing today (button still in layout). */
+  todayBtnHidden: {
+    opacity: 0,
+  },
+  todayBtnPressed: {
+    opacity: 0.7,
+  },
   todayBtnText: {
     fontSize: 13,
     fontWeight: '600',
@@ -232,7 +248,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.25)',
     overflow: 'hidden',
   },
   gameCardContent: {

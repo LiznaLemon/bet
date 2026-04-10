@@ -80,7 +80,7 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
           <View style={styles.valueInner}>
             <ThemedText style={[styles.valueLine, styles.leftValueLine]} numberOfLines={1}>
               {leftRank != null ? (
-                <ThemedText style={[styles.rankSuffix, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.rankSuffix, { color: colors.textSecondary }]}>
                   {`${formatOrdinal(leftRank)} • `}
                 </ThemedText>
               ) : null}
@@ -91,7 +91,7 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
             style={[
               styles.barTrack,
               styles.barTrackLeft,
-              { width: sideWidth, backgroundColor: colors.border + '60' },
+              isPercent && { backgroundColor: colors.chartBackground },
             ]}
           >
             <View
@@ -106,7 +106,7 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
       <ThemedText
         style={[
           styles.label,
-          { width: TEAM_COMPARISON_LABEL_COLUMN_WIDTH, color: colors.secondaryText },
+          { width: TEAM_COMPARISON_LABEL_COLUMN_WIDTH, color: colors.text },
         ]}
         numberOfLines={1}>
         {label}
@@ -117,7 +117,7 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
             <ThemedText style={[styles.valueLine, styles.rightValueLine]} numberOfLines={1}>
               {rightLabel}
               {rightRank != null ? (
-                <ThemedText style={[styles.rankSuffix, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.rankSuffix, { color: colors.textSecondary }]}>
                   {` • ${formatOrdinal(rightRank)}`}
                 </ThemedText>
               ) : null}
@@ -127,7 +127,7 @@ export const TeamComparisonBar = memo(function TeamComparisonBar({
             style={[
               styles.barTrack,
               styles.barTrackRight,
-              { width: sideWidth, backgroundColor: colors.border + '60' },
+              isPercent && { backgroundColor: colors.chartBackground },
             ]}
           >
             <View

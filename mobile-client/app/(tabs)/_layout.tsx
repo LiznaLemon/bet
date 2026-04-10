@@ -45,9 +45,8 @@ export default function TabLayout() {
           height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 2,
-          ...(isDark
-            ? { alignSelf: 'center', width: 240 }
-            : { alignSelf: 'stretch', width: '100%' }),
+          alignSelf: 'stretch',
+          width: '100%',
         },
         tabBarInactiveTintColor: colors.textSecondary,
       }}>

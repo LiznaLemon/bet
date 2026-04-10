@@ -15,8 +15,8 @@ import {
 } from '@/constants/player-stats-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DimensionValue } from 'react-native';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
@@ -746,7 +746,8 @@ function AnimatedStatCard({
 export default function PlayerDetailScreen() {
   const { id, name, from } = useLocalSearchParams<{ id: string; name?: string; from?: string }>();
   const colorScheme = useColorScheme();
-  const tintColor = Colors[colorScheme ?? 'light'].tint;
+  const colors = Colors[colorScheme ?? 'light'];
+  const tintColor = colors.tint;
   const backLabel = from || 'Players';
   const headerHeight = useHeaderHeight();
   const { data: playersData = [], isLoading: playersLoading, isError: playersError, refetch: refetchPlayers } = usePlayers();
@@ -860,9 +861,9 @@ export default function PlayerDetailScreen() {
         <ThemedView style={[styles.container, styles.centerContent, { paddingTop: headerHeight }]}>
           <ThemedText style={styles.errorText}>Couldn't load player</ThemedText>
           <Pressable
-            style={[styles.retryButton, { borderColor: Colors[colorScheme ?? 'light'].tint }]}
+            style={[styles.retryButton, { borderColor: colors.tint }]}
             onPress={() => void refetchPlayers()}>
-            <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme ?? 'light'].tint }]}>
+            <ThemedText style={[styles.retryButtonText, { color: colors.tint }]}>
               Tap to retry
             </ThemedText>
           </Pressable>
@@ -978,7 +979,7 @@ export default function PlayerDetailScreen() {
                   : 5;
 
             return (
-              <Animated.View style={[styles.chartCard, { marginBottom: 20 }, chartAnimatedStyle]}>
+              <Animated.View style={[styles.chartCard, { marginBottom: 20, borderColor: colors.dividerSubtle }, chartAnimatedStyle]}>
                 <View style={styles.chartStatTabs}>
                   <FilterOptionButtons
                     options={[
@@ -996,7 +997,7 @@ export default function PlayerDetailScreen() {
                     scrollable
                   />
                 </View>
-                <ThemedText style={styles.subsectionTitle}>{chartTitle}</ThemedText>
+                <ThemedText style={[styles.subsectionTitle, { color: colors.text }]}>{chartTitle}</ThemedText>
                 <MiniBarChart
                   data={chartData}
                   colorScheme={colorScheme ?? 'light'}
@@ -1023,8 +1024,8 @@ export default function PlayerDetailScreen() {
             const showShotChart = section.shotChart === true;
 
             return (
-              <View key={sectionIndex} style={styles.sectionContainer}>
-                <ThemedText style={styles.subsectionTitle}>{sectionTitle}</ThemedText>
+              <View key={sectionIndex} style={[styles.sectionContainer, { borderColor: colors.dividerSubtle }]}>
+                <ThemedText style={[styles.subsectionTitle, { color: colors.text }]}>{sectionTitle}</ThemedText>
                 {section.title === 'Season Averages' && averageInsights.length > 0 && (
                   <InsightCarousel insights={averageInsights} style={styles.insightCarouselAverages} cycleDurationMs={5000} />
                 )}
@@ -1097,9 +1098,9 @@ export default function PlayerDetailScreen() {
                                   <AnimatedStatValue value={stat.value} timePeriod={effectivePeriod} style={styles.statValue} />
                                 </AnimatedStatElement>
                                 <AnimatedStatElement timePeriod={effectivePeriod} index={1}>
-                            <ThemedText style={styles.statLabel}>{stat.label}</ThemedText>
+                            <ThemedText style={[styles.statLabel, { color: colors.text }]}>{stat.label}</ThemedText>
                             {stat.total != null && (
-                                    <ThemedText style={[styles.statLabel, styles.statTotalUnderLabel]} lightColor="#666" darkColor="#999">
+                                    <ThemedText style={[styles.statLabel, styles.statTotalUnderLabel, { color: colors.textTertiary }]}>
                                       {stat.total} Total
                                     </ThemedText>
                             )}
@@ -1340,7 +1341,6 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    opacity: 0.9,
     marginVertical: 16,
   },
   trendSubsection: {},
@@ -1348,7 +1348,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
   },
   chartStatTabs: {
     marginBottom: 12,
@@ -1388,7 +1387,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -1428,7 +1426,6 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    opacity: 0.6,
     marginTop: 2,
     textAlign: 'left',
   },

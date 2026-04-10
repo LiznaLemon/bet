@@ -29,6 +29,7 @@ const SEASON = 2026;
 
 export default function PlayersScreen() {
   const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('ppg');
   const deferredSortBy = useDeferredValue(sortBy);
@@ -135,7 +136,7 @@ export default function PlayersScreen() {
         <ThemedText type="title" style={styles.title}>
           NBA Players
         </ThemedText>
-        <ThemedText style={styles.subtitle}>2026 Season Averages</ThemedText>
+        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>2026 Season Averages</ThemedText>
       </View>
 
       {/* Search Bar */}
@@ -143,63 +144,18 @@ export default function PlayersScreen() {
         style={[
           styles.searchInput,
           {
-            backgroundColor: Colors[colorScheme].cardBackground,
-            color: Colors[colorScheme].text,
+            backgroundColor: colors.cardBackground,
+            color: colors.text,
           },
         ]}
         placeholder="Search by player or team..."
-        placeholderTextColor={Colors[colorScheme].tabIconDefault}
+        placeholderTextColor={colors.tabIconDefault}
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
-      {/* Layout Toggle (for testing - can remove later) */}
-      <View style={styles.sortContainer}>
-        {/* <ThemedText style={styles.sortLabel}>Layout:</ThemedText> */}
-        {/* <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sortButtons}
-        >
-          {[
-            { key: 'default' as const, label: 'Default' },
-            { key: 'compact' as const, label: 'Compact' },
-            { key: 'detailed' as const, label: 'Detailed' },
-            { key: 'wide' as const, label: 'Wide' },
-            { key: 'long' as const, label: 'Long' },
-          ].map(option => {
-            const isActive = cardLayout === option.key;
-            
-            return (
-              <Pressable
-                key={option.key}
-                style={({ pressed }) => [
-                  styles.sortButton,
-                  {
-                    backgroundColor: Colors[colorScheme].cardBackground,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                  isActive && {
-                    borderWidth: 1,
-                    borderColor: Colors[colorScheme].tint,
-                  },
-                ]}
-                onPress={() => setCardLayout(option.key)}>
-                <ThemedText
-                  style={[
-                    styles.sortButtonText,
-                    isActive && styles.sortButtonTextActive,
-                  ]}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </ScrollView> */}
-      </View>
-
       {/* Sort Options */}
-      <View style={styles.sortContainer}>
-        <ThemedText style={styles.sortLabel}>Sort by:</ThemedText>
+      <View style={[styles.sortContainer, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+        <ThemedText style={[styles.sortLabel, { color: colors.textSecondary }]}>Sort by:</ThemedText>
         <FilterOptionButtons
           options={[
             { key: 'ppg', label: 'Points' },
@@ -230,17 +186,17 @@ export default function PlayersScreen() {
               <RefreshControl
                 refreshing={isRefetching}
                 onRefresh={handleRefresh}
-                tintColor={Colors[colorScheme].tint}
+                tintColor={colors.tint}
               />
             }>
             <ThemedText style={styles.errorText}>Couldn't load players</ThemedText>
-            <ThemedText style={[styles.errorSubtext, { color: Colors[colorScheme].secondaryText }]}>
+            <ThemedText style={[styles.errorSubtext, { color: colors.textSecondary }]}>
               {error instanceof Error ? error.message : 'Network or server error'}
             </ThemedText>
             <Pressable
-              style={[styles.retryButton, { borderColor: Colors[colorScheme].tint }]}
+              style={[styles.retryButton, { borderColor: colors.tint }]}
               onPress={handleRefresh}>
-              <ThemedText style={[styles.retryButtonText, { color: Colors[colorScheme].tint }]}>
+              <ThemedText style={[styles.retryButtonText, { color: colors.tint }]}>
                 Tap to retry
               </ThemedText>
             </Pressable>
@@ -272,13 +228,13 @@ export default function PlayersScreen() {
                 <RefreshControl
                   refreshing={isRefetching && !isFetchingNextPage}
                   onRefresh={handleRefresh}
-                  tintColor={Colors[colorScheme].tint}
+                  tintColor={colors.tint}
                 />
               }
               ListFooterComponent={
                 isFetchingNextPage ? (
                   <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                    <ThemedText style={[styles.errorSubtext, { color: Colors[colorScheme].secondaryText }]}>
+                    <ThemedText style={[styles.errorSubtext, { color: colors.textSecondary }]}>
                       Loading more…
                     </ThemedText>
                   </View>
@@ -286,7 +242,7 @@ export default function PlayersScreen() {
               }
               ListEmptyComponent={
                 <View style={styles.centerMessage}>
-                  <ThemedText style={styles.emptyText}>
+                  <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>
                     {searchQuery ? 'No players match your search' : 'No players found'}
                   </ThemedText>
                 </View>
@@ -314,7 +270,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    opacity: 0.6,
     marginTop: 4,
   },
   searchInput: {
@@ -327,7 +282,7 @@ const styles = StyleSheet.create({
   },
   sortContainer: {
     paddingHorizontal: 20,
-    marginBottom: 12,
+    paddingBottom: 12,
   },
   listWrapper: {
     flex: 1,
@@ -337,13 +292,11 @@ const styles = StyleSheet.create({
   },
   sortLabel: {
     fontSize: 14,
-    opacity: 0.7,
     marginBottom: 8,
   },
   resultsCount: {
     paddingHorizontal: 20,
     fontSize: 12,
-    opacity: 0.5,
     marginBottom: 12,
     width: '100%',
     textAlign: 'center',
@@ -382,7 +335,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    opacity: 0.7,
   },
   listContentEmpty: {
     flexGrow: 1,

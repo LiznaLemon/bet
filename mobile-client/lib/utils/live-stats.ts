@@ -337,6 +337,71 @@ export function getGameStateAtPlay(
   };
 }
 
+const REGULATION_GAME_SECONDS = 4 * 720;
+const QUARTER_SECONDS = 720;
+
+/** Quarter seconds remaining at start of play (720 = tip of quarter); null if unknown. */
+export function getQuarterSecondsRemainingForPlay(play: PlayByPlayRecord): number | null {
+  let secs = play.start_quarter_seconds_remaining;
+  if (secs == null && play.start_game_seconds_remaining != null) {
+    const elapsed = REGULATION_GAME_SECONDS - play.start_game_seconds_remaining;
+    secs = (QUARTER_SECONDS - (elapsed % QUARTER_SECONDS)) % QUARTER_SECONDS;
+  }
+  return secs;
+}
+
+/**
+ * Game progress in [0, 1] for timeline UI. Uses regulation clock when possible; OT and
+ * missing fields fall back to play-index interpolation within OT span.
+ */
+export function getGameProgress01(plays: PlayByPlayRecord[], playIndex: number): number {
+  if (plays.length === 0) return 0;
+  const idx = Math.min(Math.max(0, playIndex), plays.length - 1);
+  const play = plays[idx];
+  const maxIdx = Math.max(0, plays.length - 1);
+
+  if (play.period_number <= 4) {
+    const gs = play.start_game_seconds_remaining;
+    if (gs != null && gs >= 0) {
+      const p = (REGULATION_GAME_SECONDS - gs) / REGULATION_GAME_SECONDS;
+      return Math.min(1, Math.max(0, p));
+    }
+    const secs = getQuarterSecondsRemainingForPlay(play);
+    if (secs != null) {
+      const elapsedInQuarter = QUARTER_SECONDS - secs;
+      const regulationElapsed =
+        (play.period_number - 1) * QUARTER_SECONDS + elapsedInQuarter;
+      const p = regulationElapsed / REGULATION_GAME_SECONDS;
+      return Math.min(1, Math.max(0, p));
+    }
+  }
+
+  const firstOtIdx = plays.findIndex((p) => p.period_number > 4);
+  if (firstOtIdx >= 0 && play.period_number > 4) {
+    const otSpan = Math.max(1, maxIdx - firstOtIdx);
+    const t = (idx - firstOtIdx) / otSpan;
+    return Math.min(1, Math.max(0, 0.92 + t * 0.08));
+  }
+
+  return maxIdx === 0 ? 0 : idx / maxIdx;
+}
+
+/** Nearest play index for a scrub position in [0, 1]. */
+export function playIndexFromProgress01(plays: PlayByPlayRecord[], progress: number): number {
+  if (plays.length === 0) return 0;
+  const target = Math.min(1, Math.max(0, progress));
+  let best = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < plays.length; i++) {
+    const d = Math.abs(getGameProgress01(plays, i) - target);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
 function isSubstitutionPlay(play: PlayByPlayRecord): boolean {
   const typeText = (play.type_text ?? '').toLowerCase();
   return typeText.includes('substitution') || typeText.includes('sub:');

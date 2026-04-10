@@ -1,85 +1,8 @@
 import { ThemedText } from '@/components/themed-text';
-import { getTeamColors } from '@/constants/team-colors';
 import { Colors } from '@/constants/theme';
 import type { ScheduleGame } from '@/lib/types';
 import { isTeamOnBackToBack } from '@/lib/utils/date';
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-
-// TEMP: set to true to disable team shadow, show plain white text
-const USE_PLAIN_WHITE_TEXT = true;
-
-const STROKE_OFFSETS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]] as const;
-const SHADOW_OFFSET_X = 5;
-const SHADOW_OFFSET_Y = 2;
-const SHADOW_SCALE = 0.95;
-
-function TextWithTeamShadow({
-  children,
-  teamColors,
-  baseStyle,
-  colors,
-}: {
-  children: ReactNode;
-  teamColors: readonly string[];
-  baseStyle: object;
-  colors: { text: string };
-}) {
-  const chars = String(children).split('');
-  const palette = teamColors.length > 0 ? [...teamColors] : ['#6b7280'];
-  const flat = StyleSheet.flatten(baseStyle as object) as Record<string, unknown>;
-  const { minWidth: _, ...charStyle } = flat;
-  const style = charStyle as object;
-
-  return (
-    <View style={[styles.shadowTextWrap, styles.charRow]}>
-      {chars.map((char, i) => {
-        const borderColor = palette[i % palette.length];
-        return (
-          <View key={i} style={styles.charCell}>
-            <Text style={[style, styles.charSizer]} numberOfLines={1}>
-              {char}
-            </Text>
-            {STROKE_OFFSETS.map(([dx, dy]) => (
-              <Text
-                key={`${dx}-${dy}`}
-                style={[
-                  style,
-                  styles.charStroke,
-                  {
-                    color: borderColor,
-                    left: dx + SHADOW_OFFSET_X,
-                    top: dy + SHADOW_OFFSET_Y,
-                    transform: [{ scale: SHADOW_SCALE }],
-                  },
-                ]}
-                numberOfLines={1}>
-                {char}
-              </Text>
-            ))}
-            <Text
-              style={[
-                style,
-                styles.charFill,
-                {
-                  color: '#000000',
-                  left: SHADOW_OFFSET_X,
-                  top: SHADOW_OFFSET_Y,
-                  transform: [{ scale: SHADOW_SCALE }],
-                },
-              ]}
-              numberOfLines={1}>
-              {char}
-            </Text>
-            <ThemedText style={[style, styles.charTop, { color: colors.text }]} numberOfLines={1}>
-              {char}
-            </ThemedText>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
+import { StyleSheet, View } from 'react-native';
 
 /** Parse YYYY-MM-DD as local date */
 function parseLocalDate(dateStr: string): Date {
@@ -119,18 +42,18 @@ function TeamRecordRow({
 }: {
   record: string | null | undefined;
   isB2B: boolean;
-  colors: { secondaryText: string; icon?: string };
+  colors: { textSecondary: string; icon?: string; chipBackgroundMuted: string; chipText: string };
 }) {
   const displayRecord = formatRecordForDisplay(record);
-  const recordColor = colors.icon ?? colors.secondaryText;
+  const recordColor = colors.icon ?? colors.textSecondary;
   return (
     <View style={styles.recordColumn}>
       {displayRecord ? (
         <ThemedText style={[styles.recordText, { color: recordColor }]}>{displayRecord}</ThemedText>
       ) : null}
       {isB2B && (
-        <View style={styles.b2bBadge}>
-          <ThemedText style={styles.b2bBadgeText}>back to back</ThemedText>
+        <View style={[styles.b2bBadge, { backgroundColor: colors.chipBackgroundMuted }]}>
+          <ThemedText style={[styles.b2bBadgeText, { color: colors.chipText }]}>back to back</ThemedText>
         </View>
       )}
     </View>
@@ -142,12 +65,15 @@ export function GameMatchupDisplay({
   colorScheme,
   scheduleGames,
   liveLabel,
+  scoreLayout = 'spread',
 }: {
   game: ScheduleGame;
   colorScheme: 'light' | 'dark';
   scheduleGames?: ScheduleGame[];
   /** When set, replaces the date/time label with a live-game indicator. */
   liveLabel?: string;
+  /** `centered`: away – home grouped in the middle (e.g. live tab). Default `spread` for schedule cards. */
+  scoreLayout?: 'spread' | 'centered';
 }) {
   const colors = Colors[colorScheme];
   const showScores =
@@ -157,8 +83,6 @@ export function GameMatchupDisplay({
   const awayWon = showScores && (game.awayScore ?? 0) > (game.homeScore ?? 0);
   const homeWon = showScores && (game.homeScore ?? 0) > (game.awayScore ?? 0);
   const isTie = showScores && (game.awayScore ?? 0) === (game.homeScore ?? 0);
-  const awayColors = getTeamColors(game.awayTeamAbbrev);
-  const homeColors = getTeamColors(game.homeTeamAbbrev);
   const enrichedGame =
     scheduleGames?.find((g) => g.id === game.id) ??
     scheduleGames?.find((g) => g.gameId === game.id);
@@ -180,90 +104,88 @@ export function GameMatchupDisplay({
       <View style={styles.headerTop}>
         {liveLabel ? (
           <View style={styles.liveLabelRow}>
-            <View style={styles.liveDot} />
-            <ThemedText style={[styles.dateLabel, styles.liveLabelText]}>{liveLabel}</ThemedText>
+            <View style={[styles.liveDot, { backgroundColor: colors.statusLive }]} />
+            <ThemedText style={[styles.dateLabel, styles.liveLabelText, { color: colors.statusLive }]}>{liveLabel}</ThemedText>
           </View>
         ) : (
           <ThemedText style={styles.dateLabel}>{formatDateLabel(game)}</ThemedText>
         )}
       </View>
       {showScores ? (
-        <View style={styles.previousScoreRow}>
-          <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-            {awayWon || isTie ? (
-              <ThemedText
-                style={[styles.previousScoreText, awayWon && { color: '#24d169' }]}
-                numberOfLines={1}>
-                {game.awayScore}
-              </ThemedText>
-            ) : (
-              <View style={styles.previousScoreOutlineWrap}>
-                {STROKE_OFFSETS.map(([dx, dy]) => (
-                  <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                    {game.awayScore}
-                  </Text>
-                ))}
-                <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                  {game.awayScore}
-                </ThemedText>
-              </View>
-            )}
-            <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
+        <View
+          style={[
+            styles.previousScoreRow,
+            scoreLayout === 'centered' && styles.previousScoreRowCentered,
+          ]}>
+          <View
+            style={[
+              styles.previousScoreSide,
+              styles.previousScoreColumn,
+              scoreLayout === 'centered' && styles.previousScoreSideCentered,
+            ]}>
+            <ThemedText
+              style={[
+                styles.previousScoreText,
+                awayWon && { color: colors.scoreWinner },
+                !awayWon && !isTie && { color: colors.scoreLoser },
+              ]}
+              numberOfLines={1}>
+              {game.awayScore}
+            </ThemedText>
+            <ThemedText style={[styles.previousScoreTeamName, { color: colors.scoreTeamLabel }]}>
               {game.awayTeamAbbrev}
             </ThemedText>
             <TeamRecordRow record={awayRecord} isB2B={awayB2B} colors={colors} />
           </View>
-          <View style={styles.atWrapper}>
-            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          <View style={[styles.atWrapper, scoreLayout === 'centered' && styles.atWrapperCentered]}>
+            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.textSecondary }]}>–</ThemedText>
           </View>
-          <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-            {homeWon || isTie ? (
-              <ThemedText
-                style={[styles.previousScoreText, homeWon && { color: '#24d169' }]}
-                numberOfLines={1}>
-                {game.homeScore}
-              </ThemedText>
-            ) : (
-              <View style={styles.previousScoreOutlineWrap}>
-                {STROKE_OFFSETS.map(([dx, dy]) => (
-                  <Text key={`${dx}-${dy}`} style={[styles.previousScoreText, styles.previousScoreOutlineStroke, { left: dx, top: dy }]} numberOfLines={1}>
-                    {game.homeScore}
-                  </Text>
-                ))}
-                <ThemedText style={[styles.previousScoreText, styles.previousScoreOutlineFill, { color: colors.background }]} numberOfLines={1}>
-                  {game.homeScore}
-                </ThemedText>
-              </View>
-            )}
-            <ThemedText style={[styles.previousScoreTeamName, { color: '#ffffff' }]}>
+          <View
+            style={[
+              styles.previousScoreSide,
+              styles.previousScoreColumn,
+              scoreLayout === 'centered' && styles.previousScoreSideCentered,
+            ]}>
+            <ThemedText
+              style={[
+                styles.previousScoreText,
+                homeWon && { color: colors.scoreWinner },
+                !homeWon && !isTie && { color: colors.scoreLoser },
+              ]}
+              numberOfLines={1}>
+              {game.homeScore}
+            </ThemedText>
+            <ThemedText style={[styles.previousScoreTeamName, { color: colors.scoreTeamLabel }]}>
               {game.homeTeamAbbrev}
             </ThemedText>
             <TeamRecordRow record={homeRecord} isB2B={homeB2B} colors={colors} />
           </View>
         </View>
       ) : (
-        <View style={styles.previousScoreRow}>
-          <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-            {USE_PLAIN_WHITE_TEXT ? (
-              <ThemedText style={[styles.previousScoreText, { color: '#ffffff' }]}>{game.awayTeamAbbrev}</ThemedText>
-            ) : (
-              <TextWithTeamShadow teamColors={awayColors} baseStyle={styles.previousScoreText} colors={colors}>
-                {game.awayTeamAbbrev}
-              </TextWithTeamShadow>
-            )}
+        <View
+          style={[
+            styles.previousScoreRow,
+            scoreLayout === 'centered' && styles.previousScoreRowCentered,
+          ]}>
+          <View
+            style={[
+              styles.previousScoreSide,
+              styles.previousScoreColumn,
+              scoreLayout === 'centered' && styles.previousScoreSideCentered,
+            ]}>
+            <ThemedText style={[styles.previousScoreText, { color: colors.scoreTeamLabel }]}>{game.awayTeamAbbrev}</ThemedText>
             <TeamRecordRow record={awayRecord} isB2B={awayB2B} colors={colors} />
           </View>
-          <View style={styles.atWrapper}>
-            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.secondaryText }]}>–</ThemedText>
+          <View style={[styles.atWrapper, scoreLayout === 'centered' && styles.atWrapperCentered]}>
+            <ThemedText style={[styles.scoreDash, styles.previousScoreDash, { color: colors.textSecondary }]}>–</ThemedText>
           </View>
-          <View style={[styles.previousScoreSide, styles.previousScoreColumn]}>
-            {USE_PLAIN_WHITE_TEXT ? (
-              <ThemedText style={[styles.previousScoreText, { color: '#ffffff' }]}>{game.homeTeamAbbrev}</ThemedText>
-            ) : (
-              <TextWithTeamShadow teamColors={homeColors} baseStyle={styles.previousScoreText} colors={colors}>
-                {game.homeTeamAbbrev}
-              </TextWithTeamShadow>
-            )}
+          <View
+            style={[
+              styles.previousScoreSide,
+              styles.previousScoreColumn,
+              scoreLayout === 'centered' && styles.previousScoreSideCentered,
+            ]}>
+            <ThemedText style={[styles.previousScoreText, { color: colors.scoreTeamLabel }]}>{game.homeTeamAbbrev}</ThemedText>
             <TeamRecordRow record={homeRecord} isB2B={homeB2B} colors={colors} />
           </View>
         </View>
@@ -286,11 +208,8 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#e53935',
   },
-  liveLabelText: {
-    color: '#e53935',
-  },
+  liveLabelText: {},
   dateLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -304,18 +223,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
   },
+  previousScoreRowCentered: {
+    justifyContent: 'center',
+    gap: 20,
+  },
   previousScoreSide: {
     flex: 1,
     alignItems: 'flex-start',
-    // borderWidth: 1,
-    // borderColor: 'purple',
+  },
+  previousScoreSideCentered: {
+    flex: 0,
+    flexShrink: 0,
+    alignItems: 'center',
   },
   previousScoreColumn: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    // borderWidth: 1,
-    // borderColor: 'orange',
   },
   recordColumn: {
     marginTop: 2,
@@ -330,15 +254,11 @@ const styles = StyleSheet.create({
   },
   b2bBadge: {
     paddingHorizontal: 6,
-    // paddingVertical: 2,
     borderRadius: 4,
-    // backgroundColor: '#9ca3af',
-    backgroundColor: '#373737',
   },
   b2bBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#ffffff',
   },
   previousScoreTeamName: {
     marginTop: 0,
@@ -347,67 +267,24 @@ const styles = StyleSheet.create({
   },
   previousScoreText: {
     fontSize: 40,
-    fontWeight: '700',
+    fontWeight: '800',
     minWidth: 48,
     lineHeight: 48,
-  },
-  previousScoreOutlineWrap: {
-    position: 'relative',
-  },
-  previousScoreOutlineStroke: {
-    position: 'absolute',
-    color: '#939393',
-    fontSize: 40,
-    fontWeight: '700',
-    minWidth: 48,
-    lineHeight: 48,
-  },
-  previousScoreOutlineFill: {
-    position: 'relative',
+    textAlign: 'center',
   },
   atWrapper: {
     alignSelf: 'flex-start',
-    // borderWidth: 1,
-    // borderColor: 'cyan',
+  },
+  atWrapperCentered: {
+    alignSelf: 'center',
   },
   scoreDash: {
     fontSize: 16,
     fontWeight: '700',
-    // textTransform: 'uppercase',
     paddingTop: 12,
-    // borderWidth: 1,
-    // borderColor: 'red',
   },
   previousScoreDash: {
     fontSize: 16,
     fontWeight: '700',
-    // textTransform: 'uppercase',
-    // borderWidth: 1,
-    // borderColor: 'magenta',
-  },
-  shadowTextWrap: {
-    position: 'relative',
-  },
-  charRow: {
-    flexDirection: 'row',
-  },
-  charCell: {
-    position: 'relative',
-  },
-  charSizer: {
-    opacity: 0,
-  },
-  charStroke: {
-    position: 'absolute',
-  },
-  charFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-  charTop: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
   },
 });

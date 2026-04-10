@@ -122,7 +122,7 @@ export function InsightCarousel({
     strokeDashoffset: INSIGHT_TIMER_CIRCUMFERENCE * (1 - countdownProgress.value),
   }));
 
-  const timerColor = colorScheme === 'dark' ? Colors.dark.secondaryText : Colors.light.secondaryText;
+  const timerColor = colorScheme === 'dark' ? Colors.dark.textSecondary : Colors.light.textSecondary;
 
   if (insights.length === 0) return null;
 

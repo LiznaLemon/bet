@@ -134,7 +134,7 @@ export default function GameDetailScreen() {
       key: 'live' as const,
       label: liveTabLabel,
       leading: isLiveESPN ? (
-        <View style={[styles.liveTabDot, { backgroundColor: '#e53935' }]} />
+        <View style={[styles.liveTabDot, { backgroundColor: colors.statusLive }]} />
       ) : undefined,
     },
   ] as const;
@@ -154,7 +154,7 @@ export default function GameDetailScreen() {
             activeKey={activeTab}
             onSelect={setActiveTab}
             activeColor={colors.tint}
-            inactiveColor={colors.secondaryText}
+            inactiveColor={colors.textSecondary}
             underlineWidthFraction={0.72}
             maxUnderlineWidth={112}
             styles={{ tab: { paddingBottom: 0 } }}
@@ -167,7 +167,7 @@ export default function GameDetailScreen() {
             {gameError && !game ? (
               // Hard failure — show retry at full opacity
               <ScrollView contentContainerStyle={styles.center}>
-                <ThemedText style={[styles.errorText, { color: colors.secondaryText }]}>
+                <ThemedText style={[styles.errorText, { color: colors.textSecondary }]}>
                   Couldn't load game
                 </ThemedText>
                 <Pressable

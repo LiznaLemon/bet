@@ -1,5 +1,5 @@
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Colors, gradientFadeClear } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useRef } from 'react';
 import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -18,6 +18,8 @@ const BAR_STAGGER_DELAY_MS = 25;
 const BAR_ANIMATION_DURATION_MS = 400;
 const LABEL_FADE_DURATION_MS = 250;
 const BAR_GAP = 3;
+
+type ChartThemeColors = (typeof Colors)['light'];
 
 // Scrollable chart styling — adjust to customize
 const SCROLL_EDGE_GRADIENT_WIDTH = 24; // Width of fade at left/right edges
@@ -60,6 +62,7 @@ export const MiniBarChart = memo(function MiniBarChart({
   barWidth: barWidthProp = 16,
   highlightLastN,
 }: MiniBarChartProps) {
+  const colors = Colors[colorScheme];
   const maxValue = Math.max(...data, 1);
   const minValue = Math.min(...data, 0);
   const range = maxValue - minValue || 1;
@@ -127,7 +130,7 @@ export const MiniBarChart = memo(function MiniBarChart({
               height: chartHeight,
               paddingTop: valueLabelHeadroom,
               borderBottomWidth: 1,
-              borderBottomColor: Colors[colorScheme].border,
+              borderBottomColor: colors.border,
               ...(contentWidth != null && { width: contentWidth }),
             },
           ]}
@@ -153,7 +156,7 @@ export const MiniBarChart = memo(function MiniBarChart({
                 barHeightPx={Math.max(barHeightPx, 2)}
                 barHeightPercent={Math.max(barHeightPercent, 0.5)}
                 useGradient={useGradient}
-                colorScheme={colorScheme}
+                colors={colors}
                 masterProgress={masterProgress}
                 totalDurationMs={totalDurationMs}
                 formattedValue={formattedValue}
@@ -238,7 +241,10 @@ export const MiniBarChart = memo(function MiniBarChart({
             pointerEvents="none"
           >
             <LinearGradient
-              colors={[Colors[colorScheme].background, 'transparent']}
+              colors={[
+                colors.fadeEdgeBase,
+                gradientFadeClear(colors.fadeEdgeBase),
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
@@ -252,7 +258,10 @@ export const MiniBarChart = memo(function MiniBarChart({
             pointerEvents="none"
           >
             <LinearGradient
-              colors={['transparent', Colors[colorScheme].background]}
+              colors={[
+                gradientFadeClear(colors.fadeEdgeBase),
+                colors.fadeEdgeBase,
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
@@ -273,7 +282,7 @@ type AnimatedBarProps = {
   barHeightPx: number;
   barHeightPercent: number;
   useGradient: boolean;
-  colorScheme: 'light' | 'dark';
+  colors: ChartThemeColors;
   masterProgress: SharedValue<number>;
   totalDurationMs: number;
   formattedValue: string;
@@ -287,7 +296,7 @@ const AnimatedBar = memo(function AnimatedBar({
   barHeightPx,
   barHeightPercent,
   useGradient,
-  colorScheme,
+  colors,
   masterProgress,
   totalDurationMs,
   formattedValue,
@@ -346,7 +355,7 @@ const AnimatedBar = memo(function AnimatedBar({
           style={[
             styles.barValue,
             {
-              color: Colors[colorScheme].text,
+              color: colors.text,
               fontSize: valueLabelFontSize,
             },
           ]}>
@@ -363,14 +372,7 @@ const AnimatedBar = memo(function AnimatedBar({
         collapsable={false}>
         {useGradient ? (
           <LinearGradient
-            colors={
-              colorScheme === 'dark'
-                ? [
-                    Colors[colorScheme].barBackground,
-                    Colors[colorScheme].background,
-                  ]
-                : ['#0fc4e8', '#0a7ea4']
-            }
+            colors={[colors.chartBarGradientStart, colors.chartBarGradientEnd]}
             locations={[0, 0.99]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
@@ -380,7 +382,7 @@ const AnimatedBar = memo(function AnimatedBar({
           <View
             style={[
               styles.barFill,
-              { backgroundColor: Colors[colorScheme].barBackground },
+              { backgroundColor: colors.barBackground },
             ]}
           />
         )}

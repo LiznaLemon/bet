@@ -9,6 +9,7 @@ import {
   useRiveFile,
   useViewModelInstance,
 } from '@rive-app/react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -64,6 +65,11 @@ export type RiveMenuTabIconProps = {
   viewModelExportedInstanceName?: string;
   /** `(tabs)` screen name when this tab is selected (e.g. `index`, `players`). */
   activeWhenRouteName: string;
+  /**
+   * Binds Rive ViewModel boolean `isLightMode`. When omitted, derived from `useColorScheme()`
+   * (`true` when not dark). Prefer passing from tab layout so it matches tab bar styling.
+   */
+  isLightMode?: boolean;
   /** Feather icon if Rive fails to bind (keeps layout from looking empty). */
   fallbackFeather?: 'calendar' | 'clipboard' | 'users';
 };
@@ -79,8 +85,12 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
   viewModelName: viewModelNameProp,
   viewModelExportedInstanceName,
   activeWhenRouteName,
+  isLightMode: isLightModeProp,
   fallbackFeather,
 }: RiveMenuTabIconProps) {
+  const systemScheme = useColorScheme();
+  const isLightMode = isLightModeProp ?? (systemScheme ?? 'light') !== 'dark';
+
   const { riveFile, isLoading, error: riveLoadError } = useRiveFile(RIVE_MENU_ICONS);
   const { riveViewRef, setHybridRef } = useRive();
 
@@ -101,6 +111,10 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
     setValue: setRiveIsActive,
     error: isActiveHookError,
   } = useRiveBoolean('isActive', viewModelInstance);
+  const {
+    setValue: setRiveIsLightMode,
+    error: isLightModeHookError,
+  } = useRiveBoolean('isLightMode', viewModelInstance);
 
   const isActive = useNavigationState(
     (state) => state.routes[state.index]?.name === activeWhenRouteName
@@ -112,18 +126,30 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
   useLayoutEffect(() => {
     if (!viewModelInstance || !riveViewRef) return;
 
-    const boolProp = viewModelInstance.booleanProperty('isActive');
-    if (!boolProp) {
+    const activeProp = viewModelInstance.booleanProperty('isActive');
+    if (!activeProp) {
       console.warn(
         `[RiveMenuTabIcon] No boolean property "isActive" on ViewModel for "${artboardName}" ` +
           `(file VM: ${viewModelNameProp ?? 'artboard default'}). ` +
           'Add a boolean `isActive` on ScheduleVM / PlayersVM in Rive.'
       );
-      return;
+    } else {
+      activeProp.value = isActive;
+      setRiveIsActive(isActive);
     }
 
-    boolProp.value = isActive;
-    setRiveIsActive(isActive);
+    const lightProp = viewModelInstance.booleanProperty('isLightMode');
+    if (!lightProp) {
+      console.warn(
+        `[RiveMenuTabIcon] No boolean property "isLightMode" on ViewModel for "${artboardName}" ` +
+          `(file VM: ${viewModelNameProp ?? 'artboard default'}). ` +
+          'Add a boolean `isLightMode` on the tab ViewModels in menu_icons.riv.'
+      );
+    } else {
+      lightProp.value = isLightMode;
+      setRiveIsLightMode(isLightMode);
+    }
+
     riveViewRef.playIfNeeded();
 
     if (rafRef.current != null) {
@@ -140,7 +166,16 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
         rafRef.current = null;
       }
     };
-  }, [viewModelInstance, riveViewRef, isActive, setRiveIsActive, artboardName, viewModelNameProp]);
+  }, [
+    viewModelInstance,
+    riveViewRef,
+    isActive,
+    isLightMode,
+    setRiveIsActive,
+    setRiveIsLightMode,
+    artboardName,
+    viewModelNameProp,
+  ]);
 
   useEffect(() => {
     if (isActiveHookError) {
@@ -150,6 +185,15 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
       );
     }
   }, [isActiveHookError, artboardName]);
+
+  useEffect(() => {
+    if (isLightModeHookError) {
+      console.warn(
+        `[RiveMenuTabIcon] useRiveBoolean("isLightMode") (${artboardName}):`,
+        isLightModeHookError.message
+      );
+    }
+  }, [isLightModeHookError, artboardName]);
 
   useEffect(() => {
     if (riveLoadError) {
@@ -207,38 +251,46 @@ export const RiveMenuTabIcon = memo(function RiveMenuTabIcon({
 });
 
 /** Schedule tab — artboard `Schedule`, state machine `ScheduleSM`, ViewModel `isActive`. */
-export const RiveScheduleTabIcon = memo(function RiveScheduleTabIcon() {
+export type RiveTabIconLightModeProps = {
+  /** When set, drives Rive `isLightMode` (e.g. match tab bar). Omit to use `useColorScheme()`. */
+  isLightMode?: boolean;
+};
+
+export const RiveScheduleTabIcon = memo(function RiveScheduleTabIcon({ isLightMode }: RiveTabIconLightModeProps) {
   return (
     <RiveMenuTabIcon
       artboardName="Schedule"
       stateMachineName="ScheduleSM"
       activeWhenRouteName="index"
+      isLightMode={isLightMode}
       fallbackFeather="calendar"
     />
   );
 });
 
 /** Players tab — artboard `Players`, state machine `PlayersSM`, binds `PlayersVM.isActive`. */
-export const RivePlayersTabIcon = memo(function RivePlayersTabIcon() {
+export const RivePlayersTabIcon = memo(function RivePlayersTabIcon({ isLightMode }: RiveTabIconLightModeProps) {
   return (
     <RiveMenuTabIcon
       artboardName="Players"
       stateMachineName="PlayersSM"
       viewModelName="PlayersVM"
       activeWhenRouteName="players"
+      isLightMode={isLightMode}
       fallbackFeather="users"
     />
   );
 });
 
 /** Props tab — artboard `Props`, state machine `PropsSM`, binds `PropsVM.isActive`. */
-export const RivePropsTabIcon = memo(function RivePropsTabIcon() {
+export const RivePropsTabIcon = memo(function RivePropsTabIcon({ isLightMode }: RiveTabIconLightModeProps) {
   return (
     <RiveMenuTabIcon
       artboardName="Props"
       stateMachineName="PropsSM"
       viewModelName="PropsVM"
       activeWhenRouteName="props"
+      isLightMode={isLightMode}
       fallbackFeather="clipboard"
     />
   );

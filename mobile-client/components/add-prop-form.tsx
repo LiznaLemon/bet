@@ -1,8 +1,9 @@
 import { FilterOptionButtons } from '@/components/filter-option-buttons';
 import { PlayerAvatar } from '@/components/player-avatar';
+import { PlayerAvatarWithStatChip } from '@/components/player-avatar-with-stat-chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
+import { Colors, gradientFadeClear } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import {
@@ -96,7 +97,7 @@ type LineChipRailProps = {
     cardBackground: string;
     background: string;
     text: string;
-    secondaryText: string;
+    textSecondary: string;
     tint: string;
   };
 };
@@ -194,7 +195,7 @@ function LineChipRail({
               <ThemedText style={[styles.lineChipText, { color: isActive ? colors.tint : colors.text, lineHeight: 16 }]}>
                 {/* {direction === 'over' ? 'O' : 'U'} */} {formatLineLabel(lineValue)}+
               </ThemedText>
-              <ThemedText style={[styles.lineChipSubText, { color: colors.secondaryText, lineHeight: 12 }]}>
+              <ThemedText style={[styles.lineChipSubText, { color: colors.textSecondary, lineHeight: 12 }]}>
                 {getLineHitRateText(lineValue)}
               </ThemedText>
             </Pressable>
@@ -202,14 +203,14 @@ function LineChipRail({
         })}
       </ScrollView>
       <LinearGradient
-        colors={[backgroundColor, 'transparent']}
+        colors={[backgroundColor, gradientFadeClear(backgroundColor)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.lineChipFadeEdge, styles.lineChipFadeLeft]}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['transparent', backgroundColor]}
+        colors={[gradientFadeClear(backgroundColor), backgroundColor]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.lineChipFadeEdge, styles.lineChipFadeRight]}
@@ -552,21 +553,13 @@ export function AddPropForm({
       return (
         <View style={[styles.playerCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
           <View style={styles.playerCardHeader}>
-            <View style={styles.avatarColumn}>
-              <PlayerAvatar uri={item.athlete_headshot_href} size={48} />
-              <View
-                style={[
-                  styles.avatarAvgBadge,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.cardBackground,
-                  },
-                ]}>
-                <ThemedText style={styles.avatarAvgText}>
-                  {playerAvg.toFixed(1)} {lineStatLabel}
-                </ThemedText>
-              </View>
-            </View>
+            <PlayerAvatarWithStatChip
+              uri={item.athlete_headshot_href}
+              avatarSize={48}
+              chipLabel={`${playerAvg.toFixed(1)} ${lineStatLabel}`}
+              colorScheme={colorScheme}
+              style={styles.avatarColumn}
+            />
             <View style={styles.playerItemInfo}>
               <View style={styles.playerItemNameRow}>
                 <ThemedText style={styles.playerItemName}>{item.athlete_display_name}</ThemedText>
@@ -615,7 +608,7 @@ export function AddPropForm({
                     cardBackground: colors.cardBackground,
                     background: colors.background,
                     text: colors.text,
-                    secondaryText: colors.secondaryText,
+                    textSecondary: colors.textSecondary,
                     tint: colors.tint,
                   }}
                 />
@@ -652,10 +645,11 @@ export function AddPropForm({
       propType,
       stat,
       direction,
+      colorScheme,
       buildCombinedProp,
       colors.border,
       colors.background,
-      colors.secondaryText,
+      colors.textSecondary,
       colors.cardBackground,
       colors.tint,
       colors.text,
@@ -802,7 +796,7 @@ export function AddPropForm({
               onPress={() => setSheetExpanded((v) => !v)}
               accessibilityRole="button"
               accessibilityLabel={sheetExpanded ? 'Collapse selected props' : 'Expand selected props'}>
-              <ThemedText style={[styles.sheetArrow, { color: colors.secondaryText }]}>
+              <ThemedText style={[styles.sheetArrow, { color: colors.textSecondary }]}>
                 {sheetExpanded ? '▼' : '▲'}
               </ThemedText>
             </Pressable>
@@ -845,7 +839,7 @@ export function AddPropForm({
               onPress={() => setSelectedPropDrafts([])}
               accessibilityRole="button"
               accessibilityLabel="Clear selected props">
-              <ThemedText style={[styles.clearSelectedBtnText, { color: colors.secondaryText }]}>Clear</ThemedText>
+              <ThemedText style={[styles.clearSelectedBtnText, { color: colors.textSecondary }]}>Clear</ThemedText>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -934,22 +928,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   avatarColumn: {
-    position: 'relative',
     width: 96,
-    alignItems: 'center',
-  },
-  avatarAvgBadge: {
-    position: 'absolute',
-    bottom: -20,
-    borderWidth: 1,
-    borderRadius: 24,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    // width: '100%',
-  },
-  avatarAvgText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   playerItemInfo: {
     flex: 1,

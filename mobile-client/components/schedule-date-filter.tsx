@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, gradientFadeClear } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -43,7 +43,7 @@ export type ScheduleDateFilterProps = {
   colorScheme?: 'light' | 'dark';
 };
 
-export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = 'dark' }: ScheduleDateFilterProps) {
+export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = 'light' }: ScheduleDateFilterProps) {
   const colors = Colors[colorScheme];
   const [dayWidth, setDayWidth] = useState(44);
   const scrollRef = useRef<ScrollView>(null);
@@ -105,9 +105,27 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
 
   const todayStr = getDateStrForOffset(0);
 
+  const stripBorderColor =
+    colorScheme === 'dark' ? 'rgba(37, 37, 37, 0.5)' : colors.border;
+
   return (
-    <View style={styles.wrapper} onLayout={handleWrapperLayout}>
-      <View style={[styles.container, styles.scrollableWrapper]}>
+    <View
+      style={[
+        styles.wrapper,
+        {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: stripBorderColor,
+        },
+      ]}
+      onLayout={handleWrapperLayout}>
+      <View
+        style={[
+          styles.scrollableWrapper,
+          {
+            backgroundColor: colors.scheduleDateStripSurface,
+          },
+        ]}
+      >
         <ScrollView
           ref={scrollRef}
           horizontal
@@ -125,16 +143,16 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
                 key={dateStr}
                 onLayout={(e) => handleCellLayout(index, e)}
                 collapsable={false}
-                style={index > 0 ? { marginLeft: CELL_GAP } : undefined}
+                style={[styles.dayCellWrapper, index > 0 && { marginLeft: CELL_GAP }]}
               >
                 <Pressable
                   onPress={() => onDateChange(dateStr)}
                   style={[
                     styles.dayCell,
                     { width: dayWidth, minWidth: dayWidth },
-                    isSelected && {
-                      backgroundColor: colors.cardBackground,
-                      borderColor: colors.tint,
+                    {
+                      backgroundColor: isSelected ? colors.cardBackground : colors.background,
+                      borderColor: isSelected ? colors.tint : colors.border,
                     },
                     isPast && !isSelected && styles.dayCellPast,
                   ]}
@@ -142,7 +160,7 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
                   <Text
                     style={[
                       styles.dayLetter,
-                      isSelected && { color: colors.tint },
+                      { color: isSelected ? colors.tint : colors.textSecondary },
                     ]}
                   >
                     {dayLetter}
@@ -150,7 +168,7 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
                   <Text
                     style={[
                       styles.dayNum,
-                      isSelected && { color: colors.tint },
+                      { color: isSelected ? colors.tint : colors.text },
                     ]}
                   >
                     {dayNum}
@@ -161,14 +179,14 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
           })}
         </ScrollView>
         <LinearGradient
-          colors={['#000000', 'transparent']}
+          colors={[colors.fadeEdgeBase, gradientFadeClear(colors.fadeEdgeBase)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.fadeEdge, styles.fadeLeft]}
           pointerEvents="none"
         />
         <LinearGradient
-          colors={['transparent', '#000000']}
+          colors={[gradientFadeClear(colors.fadeEdgeBase), colors.fadeEdgeBase]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.fadeEdge, styles.fadeRight]}
@@ -182,11 +200,6 @@ export function ScheduleDateFilter({ selectedDate, onDateChange, colorScheme = '
 const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  container: {
-    backgroundColor: '#000000',
-    borderRadius: 12,
   },
   scrollableWrapper: {
     overflow: 'hidden',
@@ -202,10 +215,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 4,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.35)',
-    backgroundColor: '#000000',
+  },
+  dayCellWrapper: {
+    padding: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   dayCellPast: {
     opacity: 0.5,
@@ -226,12 +242,10 @@ const styles = StyleSheet.create({
   dayLetter: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 2,
   },
   dayNum: {
     fontSize: 16,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.95)',
   },
 });

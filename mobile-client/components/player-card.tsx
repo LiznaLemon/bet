@@ -1,5 +1,6 @@
 import { MiniBarChart } from '@/components/mini-bar-chart';
 import { PlayerAvatar } from '@/components/player-avatar';
+import { PlayerAvatarWithStatChip } from '@/components/player-avatar-with-stat-chip';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
@@ -58,6 +59,7 @@ function PlayerCardComponent({
   skipChartAnimation,
   onChartAnimationComplete,
 }: PlayerCardProps) {
+  const colors = Colors[colorScheme];
   const currentStatValue =
     sortBy === '3pm'
       ? ((player.total_three_point_made ?? 0) / Math.max(1, player.games_played ?? 1)).toFixed(1)
@@ -78,7 +80,7 @@ function PlayerCardComponent({
       <TouchableOpacity
         style={[
           styles.playerCard,
-          { backgroundColor: Colors[colorScheme].cardBackground },
+          { backgroundColor: colors.cardBackground },
         ]}
         onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <View style={styles.playerInfo}>
@@ -86,13 +88,13 @@ function PlayerCardComponent({
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
-                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                <ThemedText style={[styles.rankNumber, { color: colors.textSecondary }]}>
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
               <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
             </View>
-            <ThemedText style={styles.statAverage}>
+            <ThemedText style={[styles.statAverage, { color: colors.textSecondary }]}>
               {currentStatValue} {statLabel}
             </ThemedText>
           </View>
@@ -117,26 +119,26 @@ function PlayerCardComponent({
       <TouchableOpacity
         style={[
           styles.playerCardCompact,
-          { backgroundColor: Colors[colorScheme].cardBackground },
+          { backgroundColor: colors.cardBackground },
         ]}
         onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <PlayerAvatar uri={player.athlete_headshot_href} size={40} />
         <View style={styles.compactInfo}>
           <View style={styles.nameRow}>
             <View style={styles.rankSlot}>
-              <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+              <ThemedText style={[styles.rankNumber, { color: colors.textSecondary }]}>
                 {rank != null ? `${rank}.` : '–'}
               </ThemedText>
             </View>
             <ThemedText style={styles.playerNameCompact}>{player.athlete_display_name}</ThemedText>
           </View>
-          <ThemedText style={styles.teamText}>
+          <ThemedText style={[styles.teamText, { color: colors.textSecondary }]}>
             {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
           </ThemedText>
         </View>
         <View style={styles.compactStat}>
           <ThemedText style={styles.statValueLarge}>{currentStatValue}</ThemedText>
-          <ThemedText style={styles.statLabelSmall}>{statLabel}</ThemedText>
+          <ThemedText style={[styles.statLabelSmall, { color: colors.textTertiary }]}>{statLabel}</ThemedText>
         </View>
       </TouchableOpacity>
     );
@@ -148,7 +150,7 @@ function PlayerCardComponent({
       <TouchableOpacity
         style={[
           styles.playerCardDetailed,
-          { backgroundColor: Colors[colorScheme].cardBackground },
+          { backgroundColor: colors.cardBackground },
         ]}
         onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
         <View style={styles.detailedHeader}>
@@ -156,36 +158,36 @@ function PlayerCardComponent({
           <View style={styles.detailedInfo}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
-                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                <ThemedText style={[styles.rankNumber, { color: colors.textSecondary }]}>
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
               <ThemedText style={styles.playerNameDetailed}>{player.athlete_display_name}</ThemedText>
             </View>
-            <ThemedText style={styles.teamTextDetailed}>
+            <ThemedText style={[styles.teamTextDetailed, { color: colors.textSecondary }]}>
               {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
             </ThemedText>
-            <ThemedText style={styles.gamesPlayedText}>{player.games_played} Games</ThemedText>
+            <ThemedText style={[styles.gamesPlayedText, { color: colors.textTertiary }]}>{player.games_played} Games</ThemedText>
           </View>
         </View>
         
-        <View style={styles.detailedStats}>
+        <View style={[styles.detailedStats, { borderTopColor: colors.dividerSubtle }]}>
           <View style={styles.statColumn}>
             <ThemedText style={styles.statValue}>{player.ppg}</ThemedText>
-            <ThemedText style={styles.statLabel}>PPG</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textTertiary }]}>PPG</ThemedText>
           </View>
           <View style={styles.statColumn}>
             <ThemedText style={styles.statValue}>{player.rpg}</ThemedText>
-            <ThemedText style={styles.statLabel}>RPG</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textTertiary }]}>RPG</ThemedText>
           </View>
           <View style={styles.statColumn}>
             <ThemedText style={styles.statValue}>{player.apg}</ThemedText>
-            <ThemedText style={styles.statLabel}>APG</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textTertiary }]}>APG</ThemedText>
           </View>
         </View>
 
-        <View style={styles.chartSection}>
-          <ThemedText style={styles.chartTitle}>Last 10 Games ({statLabel})</ThemedText>
+        <View style={[styles.chartSection, { borderTopColor: colors.dividerSubtle }]}>
+          <ThemedText style={[styles.chartTitle, { color: colors.textSecondary }]}>Last 10 Games ({statLabel})</ThemedText>
           <MiniBarChart data={gameLogData} colorScheme={colorScheme} useGradient={true} animationTrigger={animationTrigger} skipAnimation={skipChartAnimation} onAnimationComplete={onChartAnimationComplete} />
         </View>
       </TouchableOpacity>
@@ -197,7 +199,7 @@ function PlayerCardComponent({
       <TouchableOpacity
         style={[
           styles.playerCardWide,
-          { borderBottomColor: Colors[colorScheme].border },
+          { borderBottomColor: colors.border },
           // { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
         onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
@@ -206,13 +208,13 @@ function PlayerCardComponent({
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
-                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                <ThemedText style={[styles.rankNumber, { color: colors.textSecondary }]}>
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
               <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
             </View>
-            <ThemedText style={styles.statAverage}>
+            <ThemedText style={[styles.statAverage, { color: colors.textSecondary }]}>
               {currentStatValue} {statLabel}
             </ThemedText>
           </View>
@@ -231,15 +233,14 @@ function PlayerCardComponent({
           !qualified && { opacity: 0.45 },
         ]}
         onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
-        {/* Player Image */}
-        <View style={styles.longHeaderColumn}>
-          <PlayerAvatar uri={player.athlete_headshot_href} size={48} style={styles.playerImageLong} />
-          <View style={[styles.statValueContainer, { borderWidth: 1, borderColor: Colors[colorScheme].border, backgroundColor: Colors[colorScheme].cardBackground }]}>
-            <ThemedText style={styles.statAverageLong}>
-              {currentStatValue} {statLabel}
-            </ThemedText>
-          </View>
-         </View>
+        <PlayerAvatarWithStatChip
+          uri={player.athlete_headshot_href}
+          avatarSize={48}
+          chipLabel={`${currentStatValue} ${statLabel}`}
+          colorScheme={colorScheme}
+          style={styles.longHeaderColumn}
+          chipStyle={{ transform: [{ translateY: 1 }] }}
+        />
         
         {/* Content Container: Name/Stat Row + Chart */}
         <View style={styles.longContentContainer}>
@@ -247,13 +248,13 @@ function PlayerCardComponent({
           <View style={styles.longHeaderRow}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
-                <ThemedText style={[styles.rankNumber, { color: Colors[colorScheme].secondaryText }]}>
+                <ThemedText style={[styles.rankNumber, { color: colors.textSecondary }]}>
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
               <ThemedText style={styles.playerNameLong}>
               {player.athlete_display_name}
-              <ThemedText style={styles.playerNameTeam}>
+              <ThemedText style={[styles.playerNameTeam, { color: colors.textSecondary }]}>
                 {' '}({toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation})
               </ThemedText>
             </ThemedText>
@@ -322,7 +323,6 @@ const styles = StyleSheet.create({
   statAverage: {
     fontSize: 14,
     fontWeight: '500',
-    opacity: 0.7,
   },
 
   // Compact Layout
@@ -343,7 +343,6 @@ const styles = StyleSheet.create({
   },
   teamText: {
     fontSize: 12,
-    opacity: 0.6,
     marginTop: 2,
   },
   compactStat: {
@@ -355,7 +354,6 @@ const styles = StyleSheet.create({
   },
   statLabelSmall: {
     fontSize: 10,
-    opacity: 0.6,
   },
 
   // Detailed Layout
@@ -379,12 +377,10 @@ const styles = StyleSheet.create({
   },
   teamTextDetailed: {
     fontSize: 13,
-    opacity: 0.7,
     marginTop: 4,
   },
   gamesPlayedText: {
     fontSize: 12,
-    opacity: 0.5,
     marginTop: 2,
   },
   detailedStats: {
@@ -392,7 +388,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
   statColumn: {
     alignItems: 'center',
@@ -403,18 +398,15 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    opacity: 0.6,
     marginTop: 2,
   },
   chartSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
   chartTitle: {
     fontSize: 12,
-    opacity: 0.6,
     marginBottom: 8,
   },
 
@@ -430,15 +422,12 @@ const styles = StyleSheet.create({
     // borderColor: 'green',
     height: 100,
   },
-  playerImageLong: {
-    marginTop: 4,
-  },
   longContentContainer: {
     flex: 1,
     flexDirection: 'column',
     // height: '100%',
     // justifyContent: 'space-between',
-    gap: 8,
+    // gap: 0,
     // height: '100%',
     // borderWidth: 1,
     // borderColor: 'blue',
@@ -463,21 +452,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playerNameTeam: {
-    opacity: 0.5,
-  },
-  statValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: -4,
-    // gap: 4,
-    borderRadius: 24,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statAverageLong: {
-    fontSize: 14,
-    fontWeight: '600',
-    // marginLeft: 12,
   },
   longChartContainer: {
     width: '100%',

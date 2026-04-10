@@ -71,6 +71,9 @@ function parseTeamRecord(raw: unknown): string | null {
 function mapRowToScheduleGame(row: Record<string, unknown>): ScheduleGame {
   const shortDetail = (row.status_type_short_detail as string) ?? null;
   const gameDate = toGameDateStr(row.game_date) ?? toGameDateStrFromDateTime(row.game_date_time);
+  const isTBD = (abbrev: string) => !abbrev || abbrev.toUpperCase() === 'TBD';
+  const homeAbbrevRaw = (row.home_abbreviation as string) ?? '';
+  const awayAbbrevRaw = (row.away_abbreviation as string) ?? '';
   return {
     id: String(row.game_id ?? ''),
     gameId: String(row.game_id ?? ''),
@@ -79,15 +82,17 @@ function mapRowToScheduleGame(row: Record<string, unknown>): ScheduleGame {
     gameTime: extractGameTime(shortDetail),
     homeTeam: (row.home_display_name as string) ?? '',
     awayTeam: (row.away_display_name as string) ?? '',
-    homeTeamAbbrev: toThreeLetterAbbrev((row.home_abbreviation as string) ?? '') || ((row.home_abbreviation as string) ?? ''),
-    awayTeamAbbrev: toThreeLetterAbbrev((row.away_abbreviation as string) ?? '') || ((row.away_abbreviation as string) ?? ''),
+    homeTeamAbbrev: isTBD(homeAbbrevRaw) ? 'TBD' : (toThreeLetterAbbrev(homeAbbrevRaw) || homeAbbrevRaw),
+    awayTeamAbbrev: isTBD(awayAbbrevRaw) ? 'TBD' : (toThreeLetterAbbrev(awayAbbrevRaw) || awayAbbrevRaw),
     venue: (row.venue_full_name as string) ?? null,
     timeDisplay: shortDetail,
     homeScore: row.home_score != null ? Number(row.home_score) : null,
     awayScore: row.away_score != null ? Number(row.away_score) : null,
     completed: Boolean(row.status_type_completed),
-    homeRecord: parseTeamRecord(row.home_records),
-    awayRecord: parseTeamRecord(row.away_records),
+    homeRecord: isTBD(homeAbbrevRaw) ? null : parseTeamRecord(row.home_records),
+    awayRecord: isTBD(awayAbbrevRaw) ? null : parseTeamRecord(row.away_records),
+    seriesHeadline: (row.notes_headline as string) ?? null,
+    seasonType: row.season_type != null ? Number(row.season_type) : null,
   };
 }
 
@@ -100,22 +105,24 @@ function mapEnrichedRowToScheduleGame(row: Record<string, unknown>): ScheduleGam
 
 async function fetchScheduleEnriched(
   season: number,
-  dateRange?: { startDate: string; endDate: string }
+  dateRange?: { startDate: string; endDate: string },
+  seasonType?: number
 ): Promise<ScheduleGame[]> {
   const { data, error } = await supabase.rpc('get_schedule_enriched', {
     p_season: season,
     p_start_date: dateRange?.startDate ?? null,
     p_end_date: dateRange?.endDate ?? null,
+    p_season_type: seasonType ?? null,
   });
 
   if (error) throw error;
   return (data ?? []).map((row: Record<string, unknown>) => mapEnrichedRowToScheduleGame(row));
 }
 
-export function useSchedule(season = 2026) {
+export function useSchedule(season = 2026, seasonType?: number) {
   return useQuery({
-    queryKey: ['schedule', season],
-    queryFn: () => fetchScheduleEnriched(season),
+    queryKey: ['schedule', season, seasonType ?? null],
+    queryFn: () => fetchScheduleEnriched(season, undefined, seasonType),
     staleTime: 60 * 1000,
     refetchOnMount: 'always',
   });
@@ -126,11 +133,11 @@ export function useScheduleForDateRange(
   startDate: string,
   endDate: string,
   season = 2026,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; seasonType?: number }
 ) {
   return useQuery({
-    queryKey: ['schedule', season, startDate, endDate],
-    queryFn: () => fetchScheduleEnriched(season, { startDate, endDate }),
+    queryKey: ['schedule', season, startDate, endDate, options?.seasonType ?? null],
+    queryFn: () => fetchScheduleEnriched(season, { startDate, endDate }, options?.seasonType),
     staleTime: 60 * 1000,
     refetchOnMount: 'always',
     enabled: options?.enabled ?? true,
@@ -157,6 +164,8 @@ export function useScheduleForSelectedDate(
   const startDate = selectedDate < baseStart ? selectedDate : baseStart;
   const endDate = selectedDate > baseEnd ? selectedDate : baseEnd;
 
+  // Passing no seasonType (undefined → null in RPC) returns regular season + playoffs,
+  // excluding preseason. This handles date ranges that span the regular/playoff transition.
   return useScheduleForDateRange(startDate, endDate, season);
 }
 
@@ -164,11 +173,11 @@ export async function fetchGameById(gameId: string, season = 2026): Promise<Sche
   const { data, error } = await supabase
     .from('schedules')
     .select(
-      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score, home_records, away_records'
+      'game_id, game_date, game_date_time, home_abbreviation, away_abbreviation, home_display_name, away_display_name, venue_full_name, status_type_short_detail, status_type_completed, home_score, away_score, home_records, away_records, notes_headline, season_type'
     )
     .eq('game_id', gameId)
     .eq('season', season)
-    .eq('season_type', 2)
+    .neq('season_type', 1)
     .maybeSingle();
 
   if (error) throw error;
@@ -185,7 +194,7 @@ export async function fetchGameById(gameId: string, season = 2026): Promise<Sche
       .select('home_abbreviation, away_abbreviation, home_score, away_score, status_type_completed')
       .eq('game_date', prevDay)
       .eq('season', season)
-      .eq('season_type', 2);
+      .neq('season_type', 1);
     if (prevGames) {
       const buildB2BContext = (aliases: string[]) => {
         const pg = prevGames.find(
@@ -290,7 +299,7 @@ export async function fetchTeamRecentResults(
     .from('schedules')
     .select('game_id, game_date, home_abbreviation, away_abbreviation, home_score, away_score')
     .eq('season', season)
-    .eq('season_type', 2)
+    .neq('season_type', 1)
     .eq('status_type_completed', true)
     .not('home_score', 'is', null)
     .not('away_score', 'is', null)

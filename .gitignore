@@ -34,6 +34,7 @@ expo-env.d.ts
 # IDE / editors
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
@@ -49,8 +50,14 @@ expo-env.d.ts
 tmp/
 temp/
 .cache/
+supabase/.temp/
 
 # Project-specific
 cloud-config.yml
 uploads/
 scripts/backfill_injury_snapshots.py
+
+# Design files
+designs/
+app-designs/
+designs.pen

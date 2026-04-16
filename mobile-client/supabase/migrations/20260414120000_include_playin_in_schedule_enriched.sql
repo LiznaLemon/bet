@@ -1,8 +1,5 @@
--- Adds playoff support to get_schedule_enriched:
---   • p_season_type parameter (NULL = regular + play-in + playoffs, omits preseason)
---   • Removes hardcoded season_type = 2 filter
---   • Removes TBD team filter so pre-bracket playoff slots appear
---   • Adds notes_headline to expose series context (e.g. "NBA Finals - Game 1")
+-- Include play-in (season_type = 5) in default schedule reads.
+-- Keep 3-arg and 4-arg overloads aligned.
 CREATE OR REPLACE FUNCTION public.get_schedule_enriched(
   p_season integer DEFAULT 2026,
   p_start_date date DEFAULT NULL,
@@ -42,8 +39,6 @@ RETURNS TABLE (
       s.notes_headline, s.season_type
     FROM schedules s
     WHERE s.season = p_season
-      -- When p_season_type is specified, filter to that type.
-      -- When NULL, include regular season (2), play-in (5), and playoffs (3), but not preseason (1).
       AND (
         CASE
           WHEN p_season_type IS NOT NULL THEN s.season_type = p_season_type
@@ -53,8 +48,6 @@ RETURNS TABLE (
       AND s.home_abbreviation IS NOT NULL
       AND s.game_id NOT IN (SELECT gid FROM excluded)
   ),
-  -- B2B only meaningful for known teams; TBD abbreviations are excluded from this CTE
-  -- so they don't generate false positives.
   team_games AS (
     SELECT game_id, game_date, UPPER(home_abbreviation) AS team, 'home' AS side
     FROM base WHERE home_abbreviation != 'TBD'
@@ -85,4 +78,50 @@ RETURNS TABLE (
     AND (p_end_date IS NULL OR b.game_date <= p_end_date)
   ORDER BY b.game_date, b.game_date_time;
 $$;
+
 ALTER FUNCTION public.get_schedule_enriched(integer, date, date, integer) SET search_path = 'public';
+
+CREATE OR REPLACE FUNCTION public.get_schedule_enriched(
+  p_season integer DEFAULT 2026,
+  p_start_date date DEFAULT NULL,
+  p_end_date date DEFAULT NULL
+)
+RETURNS TABLE (
+  game_id bigint,
+  game_date date,
+  game_date_time timestamptz,
+  home_abbreviation text,
+  away_abbreviation text,
+  home_display_name text,
+  away_display_name text,
+  venue_full_name text,
+  status_type_short_detail text,
+  status_type_completed boolean,
+  home_score integer,
+  away_score integer,
+  home_records text,
+  away_records text,
+  home_back_to_back boolean,
+  away_back_to_back boolean
+) LANGUAGE sql STABLE AS $$
+  SELECT
+    e.game_id,
+    e.game_date,
+    e.game_date_time,
+    e.home_abbreviation,
+    e.away_abbreviation,
+    e.home_display_name,
+    e.away_display_name,
+    e.venue_full_name,
+    e.status_type_short_detail,
+    e.status_type_completed,
+    e.home_score,
+    e.away_score,
+    e.home_records,
+    e.away_records,
+    e.home_back_to_back,
+    e.away_back_to_back
+  FROM public.get_schedule_enriched(p_season, p_start_date, p_end_date, NULL) AS e;
+$$;
+
+ALTER FUNCTION public.get_schedule_enriched(integer, date, date) SET search_path = 'public';

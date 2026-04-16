@@ -41,3 +41,19 @@ export function getGamesForDate(games: ScheduleGame[], dateStr: string): Schedul
   return games.filter((g) => g.gameDate === dateStr);
 }
 
+/**
+ * Given a flat list of schedule games and a pivot date (YYYY-MM-DD), returns the nearest date
+ * that has at least one game:
+ *   1. Nearest future date with games (including pivot itself)
+ *   2. If none, the most recent past date with games (end-of-season fallback)
+ *   3. If none, returns null (off-season / empty dataset)
+ */
+export function findNearestGameDate(games: ScheduleGame[], pivotDate: string): string | null {
+  const dates = [...new Set(games.map((g) => g.gameDate).filter((d): d is string => !!d))].sort();
+  const future = dates.filter((d) => d >= pivotDate);
+  if (future.length > 0) return future[0];
+  const past = dates.filter((d) => d < pivotDate);
+  if (past.length > 0) return past[past.length - 1];
+  return null;
+}
+

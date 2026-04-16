@@ -7,7 +7,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GameCardSkeletonList } from '@/components/ui/game-card-skeleton';
-import { getGamesForDate, type ScheduleGame } from '@/constants/schedule';
+import { findNearestGameDate, getGamesForDate, type ScheduleGame } from '@/constants/schedule';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFadeTransition } from '@/hooks/use-fade-transition';
@@ -15,7 +15,7 @@ import { useESPNScoreboardInfo } from '@/lib/queries/espn-scoreboard';
 import { useScheduleForSelectedDate } from '@/lib/queries/schedule';
 import { getLocalDateStr } from '@/lib/utils/date';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -87,6 +87,18 @@ export default function ScheduleScreen() {
 
   const today = getLocalDateStr();
   const isToday = selectedDate === today;
+
+  // Auto-jump to the nearest date with games on first load.
+  // Uses a ref so manual date changes by the user are never overridden.
+  const hasAutoJumped = useRef(false);
+  useEffect(() => {
+    if (isLoading || isFetching || !scheduleData.length || hasAutoJumped.current) return;
+    hasAutoJumped.current = true;
+    if (getGamesForDate(scheduleData, today).length > 0) return;
+    const nearest = findNearestGameDate(scheduleData, today);
+    if (nearest && nearest !== today) setSelectedDate(nearest);
+  }, [isLoading, isFetching, scheduleData, today]);
+
   const { data: scoreboardInfo } = useESPNScoreboardInfo(selectedDate, isToday);
 
   const games = useMemo(() => {
@@ -140,17 +152,15 @@ export default function ScheduleScreen() {
 
       <View style={styles.listArea}>
         {showSkeleton ? (
-          // Skeleton renders at full opacity — no fade wrapper
           <View style={styles.listContent}>
             <GameCardSkeletonList count={4} />
           </View>
         ) : (
-          // Content fades in once data is ready
           <Animated.View style={[styles.listArea, { opacity: listOpacity }]}>
             {isError ? (
               <View style={styles.stateContainer}>
                 <ThemedText style={[styles.stateText, { color: colors.textSecondary }]}>
-                  Couldn't load schedule
+                  Couldn&apos;t load schedule
                 </ThemedText>
                 <Pressable onPress={() => void refetch()} style={[styles.retryBtn, { borderColor: colors.tint }]}>
                   <ThemedText style={[styles.retryText, { color: colors.tint }]}>Tap to retry</ThemedText>

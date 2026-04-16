@@ -13,7 +13,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-const RIVE_MENU_ICONS = require('../assets/rive/menu_icons.riv');
+const RIVE_MENU_ICONS = require('../assets/rive/menu_icons-v3.riv');
 
 const ICON_SIZE = 26;
 
@@ -261,7 +261,7 @@ export const RiveScheduleTabIcon = memo(function RiveScheduleTabIcon({ isLightMo
     <RiveMenuTabIcon
       artboardName="Schedule"
       stateMachineName="ScheduleSM"
-      activeWhenRouteName="index"
+      activeWhenRouteName="schedule"
       isLightMode={isLightMode}
       fallbackFeather="calendar"
     />
@@ -278,6 +278,20 @@ export const RivePlayersTabIcon = memo(function RivePlayersTabIcon({ isLightMode
       activeWhenRouteName="players"
       isLightMode={isLightMode}
       fallbackFeather="users"
+    />
+  );
+});
+
+/** Settings tab — artboard `Settings`, state machine `SettingsSM`, binds `SettingsVM.isActive`. */
+export const RiveSettingsTabIcon = memo(function RiveSettingsTabIcon({ isLightMode }: RiveTabIconLightModeProps) {
+  return (
+    <RiveMenuTabIcon
+      artboardName="Settings"
+      stateMachineName="SettingsSM"
+      viewModelName="SettingsVM"
+      activeWhenRouteName="settings"
+      isLightMode={isLightMode}
+      fallbackFeather="clipboard"
     />
   );
 });

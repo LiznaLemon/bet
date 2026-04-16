@@ -7,6 +7,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import {
   RivePlayersTabIcon,
   RiveScheduleTabIcon,
+  RiveSettingsTabIcon,
 } from '@/components/rive-schedule-tab-icon';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -51,7 +52,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.textSecondary,
       }}>
       <Tabs.Screen
-        name="index"
+        name="schedule"
         options={{
           title: 'Schedule',
           tabBarIcon: () => <RiveScheduleTabIcon isLightMode={isLightMode} />,
@@ -62,6 +63,13 @@ export default function TabLayout() {
         options={{
           title: 'Players',
           tabBarIcon: () => <RivePlayersTabIcon isLightMode={isLightMode} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: () => <RiveSettingsTabIcon isLightMode={isLightMode} />,
         }}
       />
       <Tabs.Screen

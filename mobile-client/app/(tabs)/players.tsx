@@ -189,7 +189,7 @@ export default function PlayersScreen() {
                 tintColor={colors.tint}
               />
             }>
-            <ThemedText style={styles.errorText}>Couldn't load players</ThemedText>
+            <ThemedText style={styles.errorText}>Couldn&apos;t load players</ThemedText>
             <ThemedText style={[styles.errorSubtext, { color: colors.textSecondary }]}>
               {error instanceof Error ? error.message : 'Network or server error'}
             </ThemedText>

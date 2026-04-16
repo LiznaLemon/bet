@@ -14,6 +14,7 @@ import {
   type TimePeriod,
 } from '@/constants/player-stats-config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -36,6 +37,7 @@ import { usePlayers } from '@/lib/queries/players';
 import { useSchedule } from '@/lib/queries/schedule';
 import { useShots } from '@/lib/queries/shots';
 import type { ScheduleGame, ShotAttempt } from '@/lib/types';
+import { formatPlayerName } from '@/lib/utils/player-display';
 
 type EnhancedPlayer = {
   athlete_id: string;
@@ -748,6 +750,7 @@ export default function PlayerDetailScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const tintColor = colors.tint;
+  const { nameFormat } = useDisplayPreferences();
   const backLabel = from || 'Players';
   const headerHeight = useHeaderHeight();
   const { data: playersData = [], isLoading: playersLoading, isError: playersError, refetch: refetchPlayers } = usePlayers();
@@ -859,7 +862,7 @@ export default function PlayerDetailScreen() {
       <>
         <Stack.Screen options={{ title: name ?? 'Player', headerLeft }} />
         <ThemedView style={[styles.container, styles.centerContent, { paddingTop: headerHeight }]}>
-          <ThemedText style={styles.errorText}>Couldn't load player</ThemedText>
+          <ThemedText style={styles.errorText}>Couldn&apos;t load player</ThemedText>
           <Pressable
             style={[styles.retryButton, { borderColor: colors.tint }]}
             onPress={() => void refetchPlayers()}>
@@ -912,7 +915,7 @@ export default function PlayerDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: player.athlete_display_name, headerLeft }} />
+      <Stack.Screen options={{ title: formatPlayerName(player.athlete_display_name, nameFormat), headerLeft }} />
 
       <Animated.View style={[StyleSheet.absoluteFill, screenAnimatedStyle]}>
       <ScrollView
@@ -927,7 +930,7 @@ export default function PlayerDetailScreen() {
             contentFit="cover"
           />
           <View style={styles.headerInfo}>
-            <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            <ThemedText style={styles.playerName}>{formatPlayerName(player.athlete_display_name, nameFormat)}</ThemedText>
             <ThemedText style={styles.playerPosition}>
               {player.athlete_position_name ?? player.athlete_position_abbreviation}
             </ThemedText>

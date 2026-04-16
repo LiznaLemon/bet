@@ -11,6 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { getTeamColor } from '@/constants/team-colors';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import {
   computeLivePropInsight,
   getCurrentStatValue,
@@ -34,6 +35,7 @@ import {
   aggregateBoxScoresByTeam,
   aggregateLiveStatsByTeam,
 } from '@/lib/utils/game-team-stats';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import type { AccumulatedStats } from '@/lib/utils/live-stats';
 import {
   accumulateStatsFromPlays,
@@ -80,6 +82,7 @@ export function GameLiveView({
 }: GameLiveViewProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
   const insets = useSafeAreaInsets();
 
   const { data: leagueContext } = useLeagueQuarterStats(SEASON);
@@ -301,9 +304,9 @@ export function GameLiveView({
       if (!name) return baseText;
       const lastName = name.split(' ').pop() ?? '';
       if (lastName && baseText.includes(lastName)) return baseText;
-      return `${name} — ${baseText}`;
+      return `${formatPlayerName(name, nameFormat)} — ${baseText}`;
     },
-    [playerMap, boxScores]
+    [playerMap, boxScores, nameFormat]
   );
 
   const liveStatLeaders = useMemo(() => {
@@ -502,11 +505,11 @@ export function GameLiveView({
                       <View
                         key={player.athlete_id}
                         style={[styles.playerStatRow, { backgroundColor: colors.background }]}>
-                        <PlayerAvatar uri={player.athlete_headshot_href} size={40} style={styles.headshotMargin} />
+                        <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={40} style={styles.headshotMargin} />
                         <View style={styles.playerStatInfo}>
                           <View style={styles.playerNameRow}>
                             <ThemedText style={styles.playerName} numberOfLines={1}>
-                              {player.athlete_display_name}
+                              {formatPlayerName(player.athlete_display_name, nameFormat)}
                             </ThemedText>
                             {isOnCourt && (
                               <View style={[styles.onCourtBadge, { borderColor: colors.border }]}>
@@ -800,6 +803,7 @@ function LivePropCard({
 }: LivePropCardProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
 
   const { data: quarterRowsPrimary } = usePlayerQuarterStats(
     prop.playerId,
@@ -917,7 +921,7 @@ function LivePropCard({
       <View style={styles.propHeader}>
         <View style={styles.propPlayerRow}>
           <View style={styles.headshotWrapper}>
-            <PlayerAvatar uri={player.athlete_headshot_href} size={40} style={styles.headshotMargin} />
+            <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={40} style={styles.headshotMargin} />
             {isSingleProp(prop) && liveInsight && showBadge && (
               <View
                 style={[
@@ -936,7 +940,7 @@ function LivePropCard({
           </View>
           <View>
             <View style={styles.propPlayerNameRow}>
-              <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+              <ThemedText style={styles.playerName}>{formatPlayerName(player.athlete_display_name, nameFormat)}</ThemedText>
               {isOnCourt && (
                 <View style={[styles.onCourtBadge, { borderColor: colors.border }]}>
                   <ThemedText style={[styles.onCourtBadgeText, { color: colors.scoreWinner }]}>On court</ThemedText>

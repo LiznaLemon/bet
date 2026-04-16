@@ -15,6 +15,10 @@ export function playerAvatarStatChipLayoutHeight(avatarSize: number) {
 
 export type PlayerAvatarWithStatChipProps = {
   uri?: string | null;
+  displayName?: string | null;
+  teamAbbrev?: string | null;
+  showTeamImageUnderlay?: boolean;
+  overlayOpacity?: number;
   avatarSize?: number;
   /**
    * Text in the pill overlapping the bottom of the avatar (e.g. "24.5 PPG", "+3").
@@ -49,6 +53,10 @@ export type PlayerAvatarWithStatChipProps = {
  */
 export function PlayerAvatarWithStatChip({
   uri,
+  displayName,
+  teamAbbrev,
+  showTeamImageUnderlay = false,
+  overlayOpacity,
   avatarSize = 48,
   chipLabel,
   chipVariant = 'outlined',
@@ -106,6 +114,10 @@ export function PlayerAvatarWithStatChip({
         <View style={[styles.overlayMeasureBox, { width: avatarSize, height: measureH }]}>
           <PlayerAvatar
             uri={uri}
+            displayName={displayName}
+            teamAbbrev={teamAbbrev}
+            showTeamImageUnderlay={showTeamImageUnderlay}
+            overlayOpacity={overlayOpacity}
             size={avatarSize}
             style={[styles.avatarTopInset, avatarStyle]}
           />
@@ -125,6 +137,10 @@ export function PlayerAvatarWithStatChip({
     <View style={[styles.column, style]}>
       <PlayerAvatar
         uri={uri}
+        displayName={displayName}
+        teamAbbrev={teamAbbrev}
+        showTeamImageUnderlay={showTeamImageUnderlay}
+        overlayOpacity={overlayOpacity}
         size={avatarSize}
         style={[styles.avatarTopInset, avatarStyle]}
       />

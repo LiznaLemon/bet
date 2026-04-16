@@ -100,9 +100,11 @@ export const ShotChart = memo(function ShotChart({
   const [filter, setFilter] = useState<ShotFilter>('all');
   const [breakdownFilter, setBreakdownFilter] = useState<BreakdownFilter>('accuracy');
   const colors = Colors[colorScheme];
+  const madeColor = colors.scoreWinner;
+  const missedColor = colors.statusLive;
 
-  const courtColor = colorScheme === 'dark' ? '#000000' : '#f0efe9';
-  const paintColor = colorScheme === 'dark' ? '#000000' : '#e8e2d4';
+  const courtColor = colorScheme === 'dark' ? '#000000' : '#ffffff';
+  const paintColor = colorScheme === 'dark' ? '#000000' : '#ffffff';
   const lineColor = colorScheme === 'dark' ? '#ffffff' : '#b0a898';
   const basketColor = colorScheme === 'dark' ? '#e87c2a' : '#e87c2a';
 
@@ -240,7 +242,7 @@ export const ShotChart = memo(function ShotChart({
                 ? (isPoints ? stats.pts3pt : stats.threePtAttempts) / total
                 : 0;
             }
-            const SHOT_TYPE_COLORS = { FT: '#595457', '2PT': '#B7B5B3', '3PT': '#ffffff' };
+            const SHOT_TYPE_COLORS = { FT: '#595457', '2PT': '#B7B5B3', '3PT': '#D4D4D4' };
             const segments = [
               { key: 'Free Throws', pct: ftPct, color: SHOT_TYPE_COLORS.FT },
               { key: '2PT', pct: twoPtPct, color: SHOT_TYPE_COLORS['2PT'] },
@@ -315,11 +317,16 @@ export const ShotChart = memo(function ShotChart({
               return (
                 <View key={key} style={[styles.breakdownBarRow, isIndented && styles.breakdownBarRowIndented]}>
                   <ThemedText style={[styles.breakdownBarLabel, isIndented && styles.breakdownBarLabelIndented]}>{label}</ThemedText>
-                  <View style={[styles.breakdownBarTrack, isIndented && styles.breakdownBarTrackIndented]}>
+                  <View
+                    style={[
+                      styles.breakdownBarTrack,
+                      isIndented && styles.breakdownBarTrackIndented,
+                      { backgroundColor: missedColor },
+                    ]}>
                     <View
                       style={[
                         styles.breakdownBarFill,
-                        { width: `${fillPct * 100}%` },
+                        { width: `${fillPct * 100}%`, backgroundColor: madeColor },
                       ]}
                     />
                   </View>
@@ -384,14 +391,16 @@ export const ShotChart = memo(function ShotChart({
         paintColor={paintColor}
         lineColor={lineColor}
         basketColor={basketColor}
+        madeShotColor={madeColor}
+        missedShotColor={missedColor}
       />
 
       {/* Legend — centered below the chart */}
       <View style={styles.legendContainer}>
         <View style={styles.legendRow}>
-          <View style={[styles.legendDot, styles.legendDotMade]} />
+          <View style={[styles.legendDot, styles.legendDotMade, { borderColor: madeColor }]} />
           <ThemedText style={styles.legendLabel}>Made</ThemedText>
-          <View style={[styles.legendDot, styles.legendDotMiss]} />
+          <View style={[styles.legendDot, styles.legendDotMiss, { borderColor: missedColor }]} />
           <ThemedText style={styles.legendLabel}>Missed</ThemedText>
         </View>
       </View>
@@ -407,6 +416,8 @@ type CourtSvgProps = {
   paintColor: string;
   lineColor: string;
   basketColor: string;
+  madeShotColor: string;
+  missedShotColor: string;
 };
 
 const CHART_WIDTH = 320;
@@ -489,6 +500,8 @@ const CourtSvg = memo(function CourtSvg({
   paintColor,
   lineColor,
   basketColor,
+  madeShotColor,
+  missedShotColor,
 }: CourtSvgProps) {
   const scale = CHART_WIDTH / COURT_WIDTH_FT;
 
@@ -611,7 +624,7 @@ const CourtSvg = memo(function CourtSvg({
                 cy={svgY}
                 r={2}
                 fill="transparent"
-                stroke="rgba(76, 175, 80, 1)"
+                stroke={madeShotColor}
                 strokeWidth={0.5}
                 // fill={is3pt ? '#4caf50' : '#4caf50'}
                 // fill="rgba(76, 175, 80, 0.25)"
@@ -628,7 +641,7 @@ const CourtSvg = memo(function CourtSvg({
               fill="transparent"
               // fill="#430000"
               // fill="rgba(229, 57, 53, 0.25)"
-              stroke="rgba(229, 57, 53, 1)"
+              stroke={missedShotColor}
               // stroke="rgb(150, 150, 150)"
               strokeWidth={0.5}
               opacity={1}
@@ -745,7 +758,7 @@ const styles = StyleSheet.create({
   breakdownBarFill: {
     height: '100%',
     borderRadius: 6,
-    backgroundColor: '#4caf50',
+    backgroundColor: '#16A34A',
   },
   breakdownBarPct: {
     fontSize: 12,
@@ -863,12 +876,12 @@ const styles = StyleSheet.create({
     // backgroundColor: '#ff8c42',
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#4caf50',
+    borderColor: 'transparent',
   },
   legendDotMiss: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#e53935',
+    borderColor: 'transparent',
   },
   legendLabel: {
     fontSize: 10,

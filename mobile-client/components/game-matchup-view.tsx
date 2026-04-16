@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { getTeamColor } from '@/constants/team-colors';
 import { Colors, gradientFadeClear } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import {
   getPlayerSeasonAvgFromTotals,
@@ -40,6 +41,7 @@ import {
   teamMatches,
 } from '@/lib/utils/matchup-insights';
 import type { SimilarPlayerWithGames } from '@/lib/utils/player-similarity';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import { getAbbrevAliases, toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,7 +51,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -205,6 +206,7 @@ function injuryStatusColor(status: string, textSecondary: string, statusLive: st
 function InjuryMarquee({ injuries }: { injuries: ESPNInjuryEntry[] }) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
   const translateX = useRef(new Animated.Value(0)).current;
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const [singleWidth, setSingleWidth] = useState(0);
@@ -227,10 +229,10 @@ function InjuryMarquee({ injuries }: { injuries: ESPNInjuryEntry[] }) {
 
   const renderItem = (inj: ESPNInjuryEntry, key: string) => (
     <View key={key} style={marqueeStyles.item}>
-      <PlayerAvatar uri={inj.headshotUrl} size={36} />
+      <PlayerAvatar uri={inj.headshotUrl} displayName={inj.playerName} teamAbbrev={inj.teamAbbrev} size={36} />
       <View style={marqueeStyles.meta}>
         <Text style={marqueeStyles.name} numberOfLines={1}>
-          <Text style={{ color: colors.text }}>{inj.playerName}</Text>
+          <Text style={{ color: colors.text }}>{formatPlayerName(inj.playerName, nameFormat)}</Text>
           {inj.teamAbbrev ? (
             <Text style={[marqueeStyles.name, marqueeStyles.teamAbbrev, { color: colors.textSecondary }]}>
               {` (${inj.teamAbbrev})`}
@@ -428,12 +430,12 @@ function SidelinedGroupedLines({
   lines,
   textColor,
   mutedColor,
-  avatarBgColor,
+  nameFormat,
 }: {
   lines: SidelinedLine[];
   textColor: string;
   mutedColor: string;
-  avatarBgColor: string;
+  nameFormat: 'full' | 'initial_last';
 }) {
   // Group by team, filtering to relevant stats only
   const teamGroups: Array<{ teamAbbrev: string; players: Array<{ player: Player; roles: string[] }> }> = [];
@@ -458,8 +460,10 @@ function SidelinedGroupedLines({
       {teamGroups.map(({ teamAbbrev, players }) => {
         const verb = players.length === 1 ? 'is' : 'are';
         return (
-          <Text key={teamAbbrev} style={[summaryStyles.paragraph, { color: mutedColor }]}>
-            <Text style={[summaryStyles.bold, { color: textColor }]}>{teamAbbrev}'s</Text>
+          <View key={teamAbbrev} style={summaryStyles.groupedLine}>
+            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>
+              <ThemedText style={[summaryStyles.bold, { color: textColor }]}>{teamAbbrev}{`'s`}</ThemedText>
+            </ThemedText>
             {players.map((p, i) => {
               const isFirst = i === 0;
               const isLast = i === players.length - 1;
@@ -470,18 +474,29 @@ function SidelinedGroupedLines({
                 ', lead ';
               const rolesStr = joinLeadRoles(p.roles);
               return (
-                <Text key={p.player.athlete_id}>
-                  {sep + rolesStr + ' '}
-                  <Image
-                    source={{ uri: p.player.athlete_headshot_href }}
-                    style={[summaryStyles.inlineAvatar, { backgroundColor: avatarBgColor }]}
-                  />
-                  {' '}
-                  <Text style={[summaryStyles.bold, summaryStyles.outAccent]}>{p.player.athlete_display_name}</Text>
-                </Text>
+                <View key={p.player.athlete_id} style={summaryStyles.inlineChunk}>
+                  <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>
+                    {sep + rolesStr + ' '}
+                  </ThemedText>
+                  <View style={summaryStyles.inlineMention}>
+                    <PlayerAvatar
+                      uri={p.player.athlete_headshot_href}
+                      displayName={p.player.athlete_display_name}
+                      teamAbbrev={p.player.team_abbreviation}
+                      size={22}
+                      style={summaryStyles.inlineAvatar}
+                    />
+                    <ThemedText style={[summaryStyles.paragraph, summaryStyles.bold, summaryStyles.outAccent]}>
+                      {formatPlayerName(p.player.athlete_display_name, nameFormat)}
+                    </ThemedText>
+                  </View>
+                </View>
               );
             })}
-            {` ${verb} `}<Text style={[summaryStyles.bold, summaryStyles.outAccent]}>out</Text>{'.'}</Text>
+            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>{` ${verb} `}</ThemedText>
+            <ThemedText style={[summaryStyles.paragraph, summaryStyles.bold, summaryStyles.outAccent]}>out</ThemedText>
+            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>{'.'}</ThemedText>
+          </View>
         );
       })}
     </>
@@ -498,7 +513,7 @@ function MatchupSummarySection({
   seasonSeriesSummaryText,
   textColor,
   mutedColor,
-  avatarBgColor,
+  nameFormat,
   isLoading,
 }: {
   game: ScheduleGame;
@@ -510,7 +525,7 @@ function MatchupSummarySection({
   seasonSeriesSummaryText: string | null;
   textColor: string;
   mutedColor: string;
-  avatarBgColor: string;
+  nameFormat: 'full' | 'initial_last';
   isLoading: boolean;
 }) {
   const introSpans = buildIntroParts(
@@ -574,7 +589,7 @@ function MatchupSummarySection({
         lines={sidelinedStatLeaderLines}
         textColor={textColor}
         mutedColor={mutedColor}
-        avatarBgColor={avatarBgColor}
+        nameFormat={nameFormat}
       />
     </View>
   );
@@ -608,10 +623,23 @@ const summaryStyles = StyleSheet.create({
     flex: 1,
   },
   inlineAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    transform: [{ translateY: 5 }],
+    marginLeft: 2,
+    marginRight: 8,
+  },
+  groupedLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  inlineChunk: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  inlineMention: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
   },
 });
 
@@ -628,6 +656,7 @@ export function GameMatchupView({
 }: GameMatchupViewProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
 
   const {
     data: matchupBundle,
@@ -1184,7 +1213,7 @@ export function GameMatchupView({
       const rank = playerStatRanks[topAwayRebounder.athlete_id]?.rpg_rank;
       const rankStr = rank != null ? ` (#${rank})` : '';
       alerts.push(
-        `${displayHomeAbbrev} allows ${homeDef.reb_allowed_avg.toFixed(1)} RPG (#${homeDef.reb_allowed_rank}). ${topAwayRebounder.athlete_display_name}: ${rpg.toFixed(1)} RPG${rankStr}`
+        `${displayHomeAbbrev} allows ${homeDef.reb_allowed_avg.toFixed(1)} RPG (#${homeDef.reb_allowed_rank}). ${formatPlayerName(topAwayRebounder.athlete_display_name, nameFormat)}: ${rpg.toFixed(1)} RPG${rankStr}`
       );
     }
     if (awayDef && topHomeRebounder && awayDef.reb_allowed_rank <= 5) {
@@ -1192,7 +1221,7 @@ export function GameMatchupView({
       const rank = playerStatRanks[topHomeRebounder.athlete_id]?.rpg_rank;
       const rankStr = rank != null ? ` (#${rank})` : '';
       alerts.push(
-        `${displayAwayAbbrev} allows ${awayDef.reb_allowed_avg.toFixed(1)} RPG (#${awayDef.reb_allowed_rank}). ${topHomeRebounder.athlete_display_name}: ${rpg.toFixed(1)} RPG${rankStr}`
+        `${displayAwayAbbrev} allows ${awayDef.reb_allowed_avg.toFixed(1)} RPG (#${awayDef.reb_allowed_rank}). ${formatPlayerName(topHomeRebounder.athlete_display_name, nameFormat)}: ${rpg.toFixed(1)} RPG${rankStr}`
       );
     }
     if (homeDef && topAwayScorer && homeDef.pts_allowed_rank >= 25) {
@@ -1200,7 +1229,7 @@ export function GameMatchupView({
       const rank = playerStatRanks[topAwayScorer.athlete_id]?.ppg_rank;
       const rankStr = rank != null ? ` (#${rank})` : '';
       alerts.push(
-        `${displayHomeAbbrev} allows ${homeDef.pts_allowed_avg.toFixed(1)} PPG (#${homeDef.pts_allowed_rank}). ${topAwayScorer.athlete_display_name}: ${ppg.toFixed(1)} PPG${rankStr}`
+        `${displayHomeAbbrev} allows ${homeDef.pts_allowed_avg.toFixed(1)} PPG (#${homeDef.pts_allowed_rank}). ${formatPlayerName(topAwayScorer.athlete_display_name, nameFormat)}: ${ppg.toFixed(1)} PPG${rankStr}`
       );
     }
     if (awayDef && topHomeScorer && awayDef.pts_allowed_rank >= 25) {
@@ -1208,7 +1237,7 @@ export function GameMatchupView({
       const rank = playerStatRanks[topHomeScorer.athlete_id]?.ppg_rank;
       const rankStr = rank != null ? ` (#${rank})` : '';
       alerts.push(
-        `${displayAwayAbbrev} allows ${awayDef.pts_allowed_avg.toFixed(1)} PPG (#${awayDef.pts_allowed_rank}). ${topHomeScorer.athlete_display_name}: ${ppg.toFixed(1)} PPG${rankStr}`
+        `${displayAwayAbbrev} allows ${awayDef.pts_allowed_avg.toFixed(1)} PPG (#${awayDef.pts_allowed_rank}). ${formatPlayerName(topHomeScorer.athlete_display_name, nameFormat)}: ${ppg.toFixed(1)} PPG${rankStr}`
       );
     }
     return alerts;
@@ -1219,6 +1248,7 @@ export function GameMatchupView({
     playerStatRanks,
     displayHomeAbbrev,
     displayAwayAbbrev,
+    nameFormat,
   ]);
 
   const pointInTimeStatsByPlayerId = useMemo(
@@ -1334,7 +1364,7 @@ export function GameMatchupView({
         seasonSeriesSummaryText={seasonSeriesSummaryText}
         textColor={colors.text}
         mutedColor={colors.textSecondary}
-        avatarBgColor={colors.border}
+        nameFormat={nameFormat}
         isLoading={summaryLoading}
       />
 
@@ -1439,11 +1469,11 @@ export function GameMatchupView({
               <View key={p.athlete_id} style={styles.matchupRow}>
                 <Pressable
                   style={styles.playerRow}
-                  onPress={() => router.push({ pathname: '/player/[id]', params: { id: p.athlete_id, name: p.athlete_display_name, from: 'Game' } })}>
-                  <PlayerAvatar uri={p.athlete_headshot_href} size={44} />
+                  onPress={() => router.push({ pathname: '/player/[id]', params: { id: p.athlete_id, name: formatPlayerName(p.athlete_display_name, nameFormat), from: 'Game' } })}>
+                  <PlayerAvatar uri={p.athlete_headshot_href} displayName={p.athlete_display_name} teamAbbrev={p.team_abbreviation} size={44} />
                   <View style={styles.playerMeta}>
                     <ThemedText style={styles.playerName}>
-                      {p.athlete_display_name}
+                      {formatPlayerName(p.athlete_display_name, nameFormat)}
                       <ThemedText style={[styles.playerTeamAbbrev, { color: colors.textSecondary }]}>
                         {' '}({toThreeLetterAbbrev((p.team_abbreviation ?? '').toUpperCase())})
                       </ThemedText>
@@ -2007,7 +2037,7 @@ export function GameMatchupView({
         <SimilarPlayersModal
           visible={!!similarModalPlayer}
           onClose={() => setSimilarModalPlayer(null)}
-          sourcePlayerName={similarModalPlayer.player.athlete_display_name}
+          sourcePlayerName={formatPlayerName(similarModalPlayer.player.athlete_display_name, nameFormat)}
           similarPlayers={similarModalPlayer.similarPlayers}
           isLoading={similarModalPlayer.isLoading}
           opponentAbbrev={

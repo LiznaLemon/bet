@@ -4,12 +4,14 @@ import {
 } from '@/components/player-avatar-with-stat-chip';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import type { GameBoxScore } from '@/lib/queries/game-boxscores';
 import type { PlayByPlayRecord } from '@/lib/queries/play-by-play';
 import {
   getGameProgress01,
   playIndexFromProgress01,
 } from '@/lib/utils/live-stats';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
@@ -70,7 +72,8 @@ function primaryLineForPlay(
   playerMap: Map<string, GameBoxScore & { game_log?: unknown[] }>,
   athleteToTeam: Map<string, string>,
   awayAbbrev: string,
-  homeAbbrev: string
+  homeAbbrev: string,
+  nameFormat: 'full' | 'initial_last'
 ): string {
   const aid = play.athlete_id_1;
   if (aid != null) {
@@ -78,7 +81,7 @@ function primaryLineForPlay(
     const p =
       playerMap.get(key) ?? playerMap.get(String(Number(aid)));
     if (p?.athlete_display_name) {
-      return p.athlete_display_name.trim();
+      return formatPlayerName(p.athlete_display_name, nameFormat);
     }
     const team =
       athleteToTeam.get(key) ?? athleteToTeam.get(String(Number(aid)));
@@ -139,6 +142,7 @@ export function PlayByPlayTimeline({
   isLiveMode,
 }: PlayByPlayTimelineProps) {
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
   const [trackWidth, setTrackWidth] = useState(0);
 
   const currentPlay = plays[playIndex];
@@ -200,7 +204,8 @@ export function PlayByPlayTimeline({
         playerMap,
         athleteToTeam,
         awayTeamAbbrev,
-        homeTeamAbbrev
+        homeTeamAbbrev,
+        nameFormat
       )
     : '';
   const secondaryRaw = currentPlay
@@ -212,6 +217,13 @@ export function PlayByPlayTimeline({
   const actorFullName = currentPlay
     ? actorDisplayNameForPlay(currentPlay, playerMap)
     : null;
+  const avatarDisplayName = currentPlay ? actorDisplayNameForPlay(currentPlay, playerMap) : null;
+  const avatarTeamAbbrev = currentPlay?.athlete_id_1 != null
+    ? athleteToTeam.get(String(currentPlay.athlete_id_1)) ??
+      athleteToTeam.get(String(Number(currentPlay.athlete_id_1))) ??
+      playerMap.get(String(currentPlay.athlete_id_1))?.team_abbreviation ??
+      playerMap.get(String(Number(currentPlay.athlete_id_1)))?.team_abbreviation
+    : undefined;
   const secondary = stripLeadingActorDescription(secondaryRaw, actorFullName);
 
   const showScoreBadge =
@@ -234,6 +246,8 @@ export function PlayByPlayTimeline({
         {hasPlayActor ? (
           <PlayerAvatarWithStatChip
             uri={headshotUri}
+            displayName={avatarDisplayName}
+            teamAbbrev={avatarTeamAbbrev}
             avatarSize={PLAY_ROW_AVATAR_SIZE}
             chipLabel={showScoreBadge ? `+${currentPlay.score_value}` : null}
             chipVariant={showScoreBadge ? 'filled' : 'outlined'}

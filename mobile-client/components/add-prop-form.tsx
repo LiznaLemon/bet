@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, gradientFadeClear } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import { PROP_STAT_OPTIONS, PROP_STAT_PLAYER_ROW_LABEL } from '@/lib/constants/prop-stat-ui';
 import {
   computeHitRatesByWindow,
@@ -14,6 +15,7 @@ import {
 import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
 import type { GameLogEntry, Player } from '@/lib/types';
 import type { CombinedProp, PlayerProp, PropStatKey, SingleProp } from '@/lib/types/props';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -261,6 +263,7 @@ export function AddPropForm({
 }: AddPropFormProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
   const insets = useSafeAreaInsets();
 
   const [propType, setPropType] = useState<'over_under' | 'double_double' | 'triple_double'>('over_under');
@@ -516,6 +519,7 @@ export function AddPropForm({
       const isOnCourt =
         onCourtPlayerIds != null &&
         (onCourtPlayerIds.has(item.athlete_id) || onCourtPlayerIds.has(String(Number(item.athlete_id))));
+      const displayName = formatPlayerName(item.athlete_display_name, nameFormat);
       const gameLog = getPlayerGameLog(item);
       const lineOptions = propType === 'over_under' ? getLineOptionsForPlayer(item, stat) : [];
       const centerLine = lineOptions[Math.floor(lineOptions.length / 2)] ?? 0;
@@ -555,6 +559,8 @@ export function AddPropForm({
           <View style={styles.playerCardHeader}>
             <PlayerAvatarWithStatChip
               uri={item.athlete_headshot_href}
+              displayName={item.athlete_display_name}
+              teamAbbrev={item.team_abbreviation}
               avatarSize={48}
               chipLabel={`${playerAvg.toFixed(1)} ${lineStatLabel}`}
               colorScheme={colorScheme}
@@ -562,7 +568,7 @@ export function AddPropForm({
             />
             <View style={styles.playerItemInfo}>
               <View style={styles.playerItemNameRow}>
-                <ThemedText style={styles.playerItemName}>{item.athlete_display_name}</ThemedText>
+                <ThemedText style={styles.playerItemName}>{displayName}</ThemedText>
                 {/* {isOnCourt && (
                   <View style={styles.onCourtBadge}>
                     <ThemedText style={styles.onCourtBadgeText}>ON</ThemedText>
@@ -806,14 +812,19 @@ export function AddPropForm({
             <View style={styles.selectedGroupsWrap}>
               {groupedSelectedByPlayer.map((group) => (
                 <View key={group.playerId} style={{ flexDirection: 'column', gap: 8 }}>
+                  {(() => {
+                    const groupTeamAbbrev = fullPlayerMap.get(group.playerId)?.team_abbreviation;
+                    return (
                   <View
                     style={[
                       styles.selectedGroupCard,
                       // { borderColor: colors.border, backgroundColor: colors.background },
                     ]}>
-                    <PlayerAvatar uri={group.playerHeadshot} size={22} />
-                    <ThemedText style={styles.selectedGroupTitle}>{group.playerName}</ThemedText>
+                    <PlayerAvatar uri={group.playerHeadshot} displayName={group.playerName} teamAbbrev={groupTeamAbbrev} size={22} />
+                    <ThemedText style={styles.selectedGroupTitle}>{formatPlayerName(group.playerName, nameFormat)}</ThemedText>
                   </View>
+                    );
+                  })()}
                   <View style={styles.selectedGroupItems}>
                     {group.items.map((draft) => (
                       <View key={draft.key} style={[styles.selectedItemRow, { borderColor: colors.border }]}>

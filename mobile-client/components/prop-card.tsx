@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import type { Player } from '@/lib/types';
 import type { PlayerProp } from '@/lib/types/props';
 import {
@@ -11,6 +12,7 @@ import {
   computePropInsights,
   formatPropDescription,
 } from '@/lib/props/compute-prop-stats';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import type { GameLogEntry, ScheduleGame } from '@/lib/types';
 import { useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -26,6 +28,7 @@ type PropCardProps = {
 export function PropCard({ prop, player, scheduleGames, otherPropsForSamePlayer = [], onRemove }: PropCardProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
 
   const gameLog = (player?.game_log ?? []) as GameLogEntry[];
   const hitRate = useMemo(() => computeHitRate(gameLog, prop), [gameLog, prop]);
@@ -53,9 +56,9 @@ export function PropCard({ prop, player, scheduleGames, otherPropsForSamePlayer 
     <ThemedView style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
       <View style={styles.header}>
         <View style={styles.playerRow}>
-          <PlayerAvatar uri={player.athlete_headshot_href} size={44} />
+          <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={44} />
           <View style={styles.playerInfo}>
-            <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+            <ThemedText style={styles.playerName}>{formatPlayerName(player.athlete_display_name, nameFormat)}</ThemedText>
             <ThemedText style={styles.propDescription}>{formatPropDescription(prop)}</ThemedText>
           </View>
         </View>

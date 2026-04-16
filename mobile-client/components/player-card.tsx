@@ -3,6 +3,8 @@ import { PlayerAvatar } from '@/components/player-avatar';
 import { PlayerAvatarWithStatChip } from '@/components/player-avatar-with-stat-chip';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import { toThreeLetterAbbrev } from '@/lib/utils/team-abbreviation';
 import { router } from 'expo-router';
 import { memo, useMemo } from 'react';
@@ -60,6 +62,8 @@ function PlayerCardComponent({
   onChartAnimationComplete,
 }: PlayerCardProps) {
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
+  const displayName = formatPlayerName(player.athlete_display_name, nameFormat);
   const currentStatValue =
     sortBy === '3pm'
       ? ((player.total_three_point_made ?? 0) / Math.max(1, player.games_played ?? 1)).toFixed(1)
@@ -82,9 +86,9 @@ function PlayerCardComponent({
           styles.playerCard,
           { backgroundColor: colors.cardBackground },
         ]}
-        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: displayName, from: 'Players' } })}>
         <View style={styles.playerInfo}>
-          <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
+          <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={50} />
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -92,7 +96,7 @@ function PlayerCardComponent({
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
-              <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+              <ThemedText style={styles.playerName}>{displayName}</ThemedText>
             </View>
             <ThemedText style={[styles.statAverage, { color: colors.textSecondary }]}>
               {currentStatValue} {statLabel}
@@ -121,8 +125,8 @@ function PlayerCardComponent({
           styles.playerCardCompact,
           { backgroundColor: colors.cardBackground },
         ]}
-        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
-        <PlayerAvatar uri={player.athlete_headshot_href} size={40} />
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: displayName, from: 'Players' } })}>
+        <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={40} />
         <View style={styles.compactInfo}>
           <View style={styles.nameRow}>
             <View style={styles.rankSlot}>
@@ -130,7 +134,7 @@ function PlayerCardComponent({
                 {rank != null ? `${rank}.` : '–'}
               </ThemedText>
             </View>
-            <ThemedText style={styles.playerNameCompact}>{player.athlete_display_name}</ThemedText>
+            <ThemedText style={styles.playerNameCompact}>{displayName}</ThemedText>
           </View>
           <ThemedText style={[styles.teamText, { color: colors.textSecondary }]}>
             {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
@@ -152,9 +156,9 @@ function PlayerCardComponent({
           styles.playerCardDetailed,
           { backgroundColor: colors.cardBackground },
         ]}
-        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: displayName, from: 'Players' } })}>
         <View style={styles.detailedHeader}>
-          <PlayerAvatar uri={player.athlete_headshot_href} size={60} />
+          <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={60} />
           <View style={styles.detailedInfo}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -162,7 +166,7 @@ function PlayerCardComponent({
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
-              <ThemedText style={styles.playerNameDetailed}>{player.athlete_display_name}</ThemedText>
+              <ThemedText style={styles.playerNameDetailed}>{displayName}</ThemedText>
             </View>
             <ThemedText style={[styles.teamTextDetailed, { color: colors.textSecondary }]}>
               {toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation} • {player.athlete_position_abbreviation}
@@ -202,9 +206,9 @@ function PlayerCardComponent({
           { borderBottomColor: colors.border },
           // { backgroundColor: Colors[colorScheme].cardBackground },
         ]}
-        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: displayName, from: 'Players' } })}>
         <View style={styles.playerInfo}>
-          <PlayerAvatar uri={player.athlete_headshot_href} size={50} />
+          <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={50} />
           <View style={styles.playerDetails}>
             <View style={styles.nameRow}>
               <View style={styles.rankSlot}>
@@ -212,7 +216,7 @@ function PlayerCardComponent({
                   {rank != null ? `${rank}.` : '–'}
                 </ThemedText>
               </View>
-              <ThemedText style={styles.playerName}>{player.athlete_display_name}</ThemedText>
+              <ThemedText style={styles.playerName}>{displayName}</ThemedText>
             </View>
             <ThemedText style={[styles.statAverage, { color: colors.textSecondary }]}>
               {currentStatValue} {statLabel}
@@ -232,9 +236,11 @@ function PlayerCardComponent({
           styles.playerCardLong,
           !qualified && { opacity: 0.45 },
         ]}
-        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: player.athlete_display_name, from: 'Players' } })}>
+        onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.athlete_id, name: displayName, from: 'Players' } })}>
         <PlayerAvatarWithStatChip
           uri={player.athlete_headshot_href}
+          displayName={player.athlete_display_name}
+          teamAbbrev={player.team_abbreviation}
           avatarSize={48}
           chipLabel={`${currentStatValue} ${statLabel}`}
           colorScheme={colorScheme}
@@ -253,7 +259,7 @@ function PlayerCardComponent({
                 </ThemedText>
               </View>
               <ThemedText style={styles.playerNameLong}>
-              {player.athlete_display_name}
+              {displayName}
               <ThemedText style={[styles.playerNameTeam, { color: colors.textSecondary }]}>
                 {' '}({toThreeLetterAbbrev(player.team_abbreviation) || player.team_abbreviation})
               </ThemedText>

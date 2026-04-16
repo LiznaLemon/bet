@@ -168,7 +168,7 @@ export default function GameDetailScreen() {
               // Hard failure — show retry at full opacity
               <ScrollView contentContainerStyle={styles.center}>
                 <ThemedText style={[styles.errorText, { color: colors.textSecondary }]}>
-                  Couldn't load game
+                  Couldn&apos;t load game
                 </ThemedText>
                 <Pressable
                   onPress={() => void refetchGame()}

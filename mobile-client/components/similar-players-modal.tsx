@@ -2,12 +2,14 @@ import { PlayerAvatar } from '@/components/player-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDisplayPreferences } from '@/lib/display-preferences';
 import type { GameLogEntry } from '@/lib/types';
 import {
   getNoteworthyBadges,
   type NoteworthyBadge,
   type SimilarPlayerWithGames,
 } from '@/lib/utils/player-similarity';
+import { formatPlayerName } from '@/lib/utils/player-display';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -65,6 +67,7 @@ export function SimilarPlayersModal({
 }: SimilarPlayersModalProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
   const insets = useSafeAreaInsets();
 
   return (
@@ -89,7 +92,7 @@ export function SimilarPlayersModal({
           <View style={styles.header}>
             <ThemedText style={styles.title}>Similar Players vs {opponentAbbrev}</ThemedText>
             <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Players like {sourcePlayerName}
+              Players like {formatPlayerName(sourcePlayerName, nameFormat)}
             </ThemedText>
             <TouchableOpacity
               onPress={onClose}
@@ -129,10 +132,10 @@ export function SimilarPlayersModal({
                   key={player.athlete_id}
                   style={[styles.playerCard, { borderColor: colors.border }]}>
                   <View style={styles.playerHeader}>
-                    <PlayerAvatar uri={player.athlete_headshot_href} size={48} />
+                    <PlayerAvatar uri={player.athlete_headshot_href} displayName={player.athlete_display_name} teamAbbrev={player.team_abbreviation} size={48} />
                     <View style={styles.playerInfo}>
                       <ThemedText style={styles.playerName}>
-                        {player.athlete_display_name}
+                        {formatPlayerName(player.athlete_display_name, nameFormat)}
                       </ThemedText>
                       <ThemedText style={[styles.playerTeam, { color: colors.textSecondary }]}>
                         {player.team_abbreviation} • {gamesVsOpponent.length} game

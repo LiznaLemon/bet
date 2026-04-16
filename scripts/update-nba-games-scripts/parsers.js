@@ -316,6 +316,110 @@ export function parseScheduleFromSummary(json) {
 }
 
 /**
+ * Parse schedule row from ESPN scoreboard event.
+ * This is used to insert missing upcoming games before they are final.
+ *
+ * @param {Object} event - ESPN scoreboard event object
+ * @returns {Object|null} Minimal schedules row for insert/update, or null
+ */
+export function parseScheduleFromScoreboardEvent(event) {
+  const competition = event?.competitions?.[0];
+  if (!competition) return null;
+
+  const competitors = competition.competitors || [];
+  const homeComp = competitors.find((c) => c.homeAway === 'home');
+  const awayComp = competitors.find((c) => c.homeAway === 'away');
+  if (!homeComp || !awayComp) return null;
+
+  const toIntOrNull = (v) => {
+    if (v == null || v === '') return null;
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? null : n;
+  };
+
+  const status = competition.status?.type || event?.status?.type || {};
+  const startDate = competition.date || event?.date || '';
+  const gameDateTime = startDate ? new Date(startDate).toISOString() : null;
+  const gameDate = gameDateTime ? gameDateTime.slice(0, 10) : null;
+
+  const homeTeam = homeComp.team || {};
+  const awayTeam = awayComp.team || {};
+  const venue = competition.venue || {};
+  const venueAddress = venue.address || {};
+  const firstNote = competition.notes?.[0] || event?.notes?.[0] || {};
+  const firstBroadcast = competition.broadcasts?.[0] || {};
+
+  return {
+    game_id: toIntOrNull(event?.id),
+    game_date: gameDate,
+    game_date_time: gameDateTime,
+    season: toIntOrNull(event?.season?.year),
+    season_type: toIntOrNull(event?.season?.type),
+    type_id: toIntOrNull(competition.type?.id),
+    type_abbreviation: competition.type?.abbreviation || null,
+    time_valid: competition.timeValid != null ? !!competition.timeValid : null,
+    neutral_site: competition.neutralSite != null ? !!competition.neutralSite : null,
+    conference_competition:
+      competition.conferenceCompetition != null ? !!competition.conferenceCompetition : null,
+    recent: competition.recent != null ? !!competition.recent : null,
+    notes_type: firstNote.type || null,
+    notes_headline: firstNote.headline || null,
+    status_clock: toIntOrNull(competition.status?.clock),
+    status_display_clock: competition.status?.displayClock || null,
+    status_period: toIntOrNull(competition.status?.period),
+    status_type_id: toIntOrNull(status.id),
+    status_type_name: status.name || null,
+    status_type_state: status.state || null,
+    status_type_completed: status.completed != null ? !!status.completed : null,
+    status_type_description: status.description || null,
+    status_type_detail: status.detail || null,
+    status_type_short_detail: status.shortDetail || null,
+    format_regulation_periods: toIntOrNull(competition.format?.regulation?.periods),
+    venue_id: toIntOrNull(venue.id),
+    venue_full_name: venue.fullName || null,
+    venue_address_city: venueAddress.city || null,
+    venue_address_state: venueAddress.state || null,
+    venue_capacity: toIntOrNull(venue.capacity),
+    venue_indoor: venue.indoor != null ? !!venue.indoor : null,
+    attendance: toIntOrNull(competition.attendance),
+    play_by_play_available:
+      competition.playByPlayAvailable != null ? !!competition.playByPlayAvailable : null,
+    PBP: competition.playByPlayAvailable ? 'true' : null,
+    broadcast_market: firstBroadcast.market || null,
+    broadcast_name: Array.isArray(firstBroadcast.names) ? firstBroadcast.names.join(', ') : null,
+    broadcast: Array.isArray(firstBroadcast.names) ? firstBroadcast.names.join(', ') : null,
+    home_id: toIntOrNull(homeComp.id),
+    home_uid: homeTeam.uid || null,
+    home_location: homeTeam.location || null,
+    home_name: homeTeam.name || null,
+    home_abbreviation: homeTeam.abbreviation || null,
+    home_display_name: homeTeam.displayName || null,
+    home_short_display_name: homeTeam.shortDisplayName || null,
+    home_color: homeTeam.color || null,
+    home_alternate_color: homeTeam.alternateColor || null,
+    home_is_active: homeTeam.isActive != null ? !!homeTeam.isActive : null,
+    home_venue_id: toIntOrNull(homeTeam?.venue?.id),
+    home_logo: homeTeam.logo || homeTeam?.logos?.[0]?.href || null,
+    home_score: toIntOrNull(homeComp.score),
+    home_winner: homeComp.winner != null ? !!homeComp.winner : null,
+    away_id: toIntOrNull(awayComp.id),
+    away_uid: awayTeam.uid || null,
+    away_location: awayTeam.location || null,
+    away_name: awayTeam.name || null,
+    away_abbreviation: awayTeam.abbreviation || null,
+    away_display_name: awayTeam.displayName || null,
+    away_short_display_name: awayTeam.shortDisplayName || null,
+    away_color: awayTeam.color || null,
+    away_alternate_color: awayTeam.alternateColor || null,
+    away_is_active: awayTeam.isActive != null ? !!awayTeam.isActive : null,
+    away_venue_id: toIntOrNull(awayTeam?.venue?.id),
+    away_logo: awayTeam.logo || awayTeam?.logos?.[0]?.href || null,
+    away_score: toIntOrNull(awayComp.score),
+    away_winner: awayComp.winner != null ? !!awayComp.winner : null,
+  };
+}
+
+/**
  * Parse team box scores
  * @param {Object} json - ESPN game summary JSON
  * @returns {Array|null} Rows for team_boxscores_raw

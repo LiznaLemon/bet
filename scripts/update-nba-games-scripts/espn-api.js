@@ -5,6 +5,38 @@
 
 const SCOREBOARD_URL = 'http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
 const SUMMARY_URL = 'http://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary';
+const DEFAULT_RETRY_COUNT = 3;
+const DEFAULT_RETRY_BACKOFF_MS = 1000;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableStatus(status) {
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+async function fetchJsonWithRetry(url, { retries = DEFAULT_RETRY_COUNT, label = 'request' } = {}) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = new Error(`${label} failed: ${res.status} ${res.statusText}`);
+        err.status = res.status;
+        throw err;
+      }
+      return await res.json();
+    } catch (error) {
+      lastError = error;
+      const canRetry = attempt <= retries && (error?.status == null || isRetryableStatus(error.status));
+      if (!canRetry) break;
+      const delay = DEFAULT_RETRY_BACKOFF_MS * Math.pow(2, attempt - 1);
+      await sleep(delay);
+    }
+  }
+  throw lastError;
+}
 
 /**
  * Fetch scoreboard for a given date
@@ -15,12 +47,7 @@ export async function fetchScoreboard(date) {
   const dateStr = typeof date === 'string' ? normalizeScoreboardDate(date) : formatDateYYYYMMDD(date);
   const url = `${SCOREBOARD_URL}?limit=1000&dates=${dateStr}`;
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`ESPN scoreboard failed: ${res.status} ${res.statusText}`);
-  }
-
-  const data = await res.json();
+  const data = await fetchJsonWithRetry(url, { label: 'ESPN scoreboard' });
   const events = data.events || [];
 
   return events
@@ -42,12 +69,7 @@ export async function fetchScoreboardAllEvents(date) {
   const dateStr = typeof date === 'string' ? normalizeScoreboardDate(date) : formatDateYYYYMMDD(date);
   const url = `${SCOREBOARD_URL}?limit=1000&dates=${dateStr}`;
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`ESPN scoreboard failed: ${res.status} ${res.statusText}`);
-  }
-
-  const data = await res.json();
+  const data = await fetchJsonWithRetry(url, { label: 'ESPN scoreboard' });
   const events = data.events || [];
 
   return events.map((e) => mapScoreboardEvent(e, dateStr));
@@ -75,13 +97,7 @@ function normalizeScoreboardDate(s) {
  */
 export async function fetchGameSummary(gameId) {
   const url = `${SUMMARY_URL}?event=${gameId}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`ESPN summary failed for game ${gameId}: ${res.status} ${res.statusText}`);
-  }
-
-  return res.json();
+  return fetchJsonWithRetry(url, { label: `ESPN summary for game ${gameId}` });
 }
 
 /**

@@ -6,9 +6,9 @@ on:
         paths:
             - "bet_backend/**"
             - "scripts/update-nba-games-scripts/**"
-    # 10:00 UTC — after typical West Coast games + buffer; GitHub cron is always UTC
+    # Hourly cadence; updater auto-detects playoff/regular/offseason mode.
     schedule:
-        - cron: "0 10 * * *"
+        - cron: "0 * * * *"
 
 jobs:
     deploy:
@@ -154,6 +154,7 @@ jobs:
                   cat > /root/.env.nba-updater << 'ENVEOF'
                   SUPABASE_API_URL=${{ secrets.SUPABASE_API_URL }}
                   SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+                  NBA_UPDATER_MODE=auto
                   ENVEOF
                   chmod 600 /root/.env.nba-updater
                   "
@@ -194,7 +195,8 @@ jobs:
 
                   echo "$(date): Starting NBA data update..."
                   echo "Using API URL: $SUPABASE_API_URL"
-                  /usr/bin/node update-nba-data.js
+                  echo "Updater mode: ${NBA_UPDATER_MODE:-auto}"
+                  /usr/bin/node update-nba-data.js --mode "${NBA_UPDATER_MODE:-auto}"
                   echo "$(date): NBA data update completed"
                   SCRIPTEOF
 
@@ -216,7 +218,7 @@ jobs:
                   }
                   LOGEOF
 
-                  # Remove legacy cron if present (NBA updates run on schedule via GitHub Actions, 10:00 UTC)
+                  # Remove legacy cron if present (NBA updates run on schedule via GitHub Actions)
                   rm -f /etc/cron.d/nba-update
 
                   echo "✓ NBA update script setup complete"
@@ -248,7 +250,7 @@ jobs:
 
                   echo ""
                   echo "=== Deployment Complete! ==="
-                  echo "API is running; NBA data sync is scheduled in GitHub Actions at 10:00 UTC daily"
+                  echo "API is running; NBA data sync is scheduled in GitHub Actions hourly"
                   echo "Logs: /var/log/nba-update.log"
                   echo ""
                   echo "To test the Node.js script manually, run:"
@@ -257,7 +259,7 @@ jobs:
 
     nba-data-update:
         if: github.event_name == 'schedule'
-        name: Scheduled NBA data update (10:00 UTC)
+        name: Scheduled NBA data update (hourly)
         runs-on: ubuntu-latest
         steps:
             - name: Set up SSH

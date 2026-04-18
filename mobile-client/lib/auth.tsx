@@ -55,6 +55,7 @@ type AuthContextValue = {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (legal?: { acceptedLegal: boolean; legalVersion: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   verifyRecoveryOtp: (email: string, token: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -451,6 +452,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    const { error } = await supabase.functions.invoke('delete-account');
+    if (error) {
+      throw error;
+    }
+    await supabase.auth.signOut();
+    setProfile(null);
+  }, []);
+
   const resetPasswordForEmail = useCallback(async (email: string) => {
     // No redirectTo needed: the email template uses an 8-digit OTP code the user
     // types into the app manually, so there's no deep link for Supabase to hand back.
@@ -502,6 +512,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signInWithGoogle,
       signOut,
+      deleteAccount,
       resetPasswordForEmail,
       verifyRecoveryOtp,
       updatePassword,
@@ -520,6 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signInWithGoogle,
       signOut,
+      deleteAccount,
       resetPasswordForEmail,
       verifyRecoveryOtp,
       updatePassword,

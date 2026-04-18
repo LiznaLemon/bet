@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,8 +10,9 @@ import { useAuth } from '@/lib/auth';
 export default function SettingsScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { signOut } = useAuth();
+  const { signOut, deleteAccount } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSignOut() {
@@ -25,6 +26,35 @@ export default function SettingsScreen() {
       setIsSigningOut(false);
     }
   }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all associated data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => void handleDeleteAccount(),
+        },
+      ],
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setErrorMessage(null);
+    setIsDeletingAccount(true);
+
+    try {
+      await deleteAccount();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not delete account');
+      setIsDeletingAccount(false);
+    }
+  }
+
+  const isLoading = isSigningOut || isDeletingAccount;
 
   return (
     <ThemedView style={styles.container}>
@@ -46,18 +76,42 @@ export default function SettingsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Log out"
-          disabled={isSigningOut}
+          disabled={isLoading}
           onPress={() => void handleSignOut()}
           style={({ pressed }) => [
             styles.signOutButton,
             { borderColor: colors.tint },
-            pressed && !isSigningOut ? styles.signOutButtonPressed : null,
-            isSigningOut ? styles.signOutButtonDisabled : null,
+            pressed && !isLoading ? styles.buttonPressed : null,
+            isLoading ? styles.buttonDisabled : null,
           ]}>
           {isSigningOut ? (
             <ActivityIndicator color={colors.tint} size="small" />
           ) : (
             <ThemedText style={[styles.signOutText, { color: colors.tint }]}>Log out</ThemedText>
+          )}
+        </Pressable>
+
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        <ThemedText style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+          Permanently delete your account and all associated data.
+        </ThemedText>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+          disabled={isLoading}
+          onPress={confirmDeleteAccount}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { borderColor: colors.statusLive },
+            pressed && !isLoading ? styles.buttonPressed : null,
+            isLoading ? styles.buttonDisabled : null,
+          ]}>
+          {isDeletingAccount ? (
+            <ActivityIndicator color={colors.statusLive} size="small" />
+          ) : (
+            <ThemedText style={[styles.deleteText, { color: colors.statusLive }]}>Delete Account</ThemedText>
           )}
         </Pressable>
 
@@ -100,6 +154,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  divider: {
+    height: 1,
+    marginVertical: 4,
+  },
   signOutButton: {
     minHeight: 46,
     borderRadius: 12,
@@ -108,13 +166,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  signOutButtonPressed: {
+  deleteButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonPressed: {
     opacity: 0.8,
   },
-  signOutButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.7,
   },
   signOutText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  deleteText: {
     fontSize: 15,
     fontWeight: '600',
   },

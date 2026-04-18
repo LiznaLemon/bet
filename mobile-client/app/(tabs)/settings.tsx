@@ -62,9 +62,6 @@ export default function SettingsScreen() {
         <ThemedText type="title" style={styles.title}>
           Settings
         </ThemedText>
-        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Account controls and app preferences will live here.
-        </ThemedText>
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>

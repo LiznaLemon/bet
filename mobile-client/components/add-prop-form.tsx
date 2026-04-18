@@ -636,7 +636,7 @@ export function AddPropForm({
               onPress={() => {
                 if (combinedDraft) toggleDraft(combinedDraft);
               }}>
-              <ThemedText style={[styles.combinedAddBtnText, { color: isCombinedSelected ? colors.tint : '#000000' }]}>
+              <ThemedText style={[styles.combinedAddBtnText, { color: isCombinedSelected ? colors.tint : colors.background }]}>
                 {isCombinedSelected ? 'Selected' : 'Select'} {propType === 'double_double' ? 'Double-Double' : 'Triple-Double'}
               </ThemedText>
             </Pressable>
@@ -860,7 +860,7 @@ export function AddPropForm({
               onPress={addSelectedLines}
               accessibilityRole="button"
               accessibilityLabel={`Add ${selectedCount} selected props`}>
-              <ThemedText style={styles.addSelectedBtnText}>Add Selected Props</ThemedText>
+              <ThemedText style={[styles.addSelectedBtnText, { color: colors.background }]}>Add Selected Props</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -1100,7 +1100,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addSelectedBtnText: {
-    color: '#000000',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1148,7 +1147,6 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   combinedAddBtnText: {
-    color: '#000000',
     fontWeight: '600',
     fontSize: 12,
   },

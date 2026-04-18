@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 export default function AuthCallbackScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { session, isAuthLoading, isProfileLoading, isHandlingAuthCallback } = useAuth();
+  const { session, isAuthLoading, isProfileLoading, isHandlingAuthCallback, isRecoveryMode } = useAuth();
 
   if (isAuthLoading || isHandlingAuthCallback || (session && isProfileLoading)) {
     return (
@@ -20,6 +20,10 @@ export default function AuthCallbackScreen() {
 
   if (!session) {
     return <Redirect href="/(auth)/sign-in" />;
+  }
+
+  if (isRecoveryMode) {
+    return <Redirect href="/(auth)/update-password" />;
   }
 
   return <Redirect href="/schedule" />;

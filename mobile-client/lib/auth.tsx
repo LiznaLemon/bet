@@ -49,11 +49,15 @@ type AuthContextValue = {
   isAuthLoading: boolean;
   isProfileLoading: boolean;
   isHandlingAuthCallback: boolean;
+  isRecoveryMode: boolean;
   profile: UserProfile | null;
   signUpWithEmail: (input: SignUpInput) => Promise<{ requiresEmailConfirmation: boolean }>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (legal?: { acceptedLegal: boolean; legalVersion: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<void>;
+  verifyRecoveryOtp: (email: string, token: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   markOnboardingCompleted: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -78,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isHandlingAuthCallback, setIsHandlingAuthCallback] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [oauthLegalIntent, setOauthLegalIntent] = useState<{
     acceptedLegal: boolean;
     legalVersion: string;
@@ -111,6 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasError: Boolean(errorCode),
     });
 
+    // Detect password recovery directly from the URL. With detectSessionInUrl: false,
+    // supabase-js never fires the PASSWORD_RECOVERY event on onAuthStateChange, so we
+    // set isRecoveryMode here before any token exchange runs.
+    if (type === 'recovery') {
+      setIsRecoveryMode(true);
+    }
+
     if (errorCode) {
       throw new Error(errorDescription ?? `Auth callback failed (${errorCode})`);
     }
@@ -136,18 +148,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Email confirmation links can contain token_hash + type instead of access/refresh tokens.
     if (tokenHash && type) {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
         type: type as EmailOtpType,
       });
       if (error) {
         throw error;
       }
-
-      authLog('verifyOtp success', {
-        hasSession: Boolean(data.session),
-        hasUser: Boolean(data.user),
-      });
       return;
     }
 
@@ -244,6 +251,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+      }
       setSession(nextSession);
       setIsAuthLoading(false);
     });
@@ -330,7 +340,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       incomingUrl.includes('refresh_token=') ||
       incomingUrl.includes('token_hash=') ||
       incomingUrl.includes('code=') ||
-      incomingUrl.includes('error_code=');
+      incomingUrl.includes('error_code=') ||
+      incomingUrl.includes('error=') ||
+      incomingUrl.includes('error_description=');
 
     if (!looksLikeAuthCallback) {
       return;
@@ -439,6 +451,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  const resetPasswordForEmail = useCallback(async (email: string) => {
+    // No redirectTo needed: the email template uses an 8-digit OTP code the user
+    // types into the app manually, so there's no deep link for Supabase to hand back.
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const verifyRecoveryOtp = useCallback(async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery',
+    });
+    if (error) {
+      throw error;
+    }
+    // supabase-js fires PASSWORD_RECOVERY on onAuthStateChange for recovery OTP
+    // verification, which flips isRecoveryMode to true and causes AuthGate to
+    // route the user to /(auth)/update-password.
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw error;
+    }
+    setIsRecoveryMode(false);
+  }, []);
+
   const markOnboardingCompleted = useCallback(async () => {
     if (!session?.user?.id) {
       throw new Error('No active user session');
@@ -453,11 +496,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       isProfileLoading,
       isHandlingAuthCallback,
+      isRecoveryMode,
       profile,
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,
       signOut,
+      resetPasswordForEmail,
+      verifyRecoveryOtp,
+      updatePassword,
       markOnboardingCompleted,
       refreshProfile,
     }),
@@ -465,6 +512,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       isHandlingAuthCallback,
       isProfileLoading,
+      isRecoveryMode,
       markOnboardingCompleted,
       profile,
       refreshProfile,
@@ -472,6 +520,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signInWithGoogle,
       signOut,
+      resetPasswordForEmail,
+      verifyRecoveryOtp,
+      updatePassword,
       signUpWithEmail,
     ],
   );

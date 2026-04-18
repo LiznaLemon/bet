@@ -27,15 +27,17 @@ function AuthGate() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const segments = useSegments();
-  const { session, isAuthLoading, isHandlingAuthCallback, isProfileLoading } = useAuth();
+  const { session, isAuthLoading, isHandlingAuthCallback, isProfileLoading, isRecoveryMode } = useAuth();
   const { hasCompletedOnboarding, isOnboardingHydrating } = useOnboardingState();
 
   const topSegment = segments[0];
+  const secondSegment = segments[1];
   const inAuthGroup = topSegment === '(auth)';
   const inAuthCallbackRoute = topSegment === 'auth';
   const inAuthArea = inAuthGroup || inAuthCallbackRoute;
   const inOnboardingGroup = topSegment === '(onboarding)';
   const inLegalGroup = topSegment === 'legal';
+  const inUpdatePasswordRoute = secondSegment === 'update-password';
 
   const isLoading =
     isAuthLoading || isOnboardingHydrating || isHandlingAuthCallback || (!!session && isProfileLoading);
@@ -58,11 +60,16 @@ function AuthGate() {
       return;
     }
 
-    if (session && (inAuthArea || inOnboardingGroup)) {
+    if (session && isRecoveryMode && !inUpdatePasswordRoute) {
+      router.replace('/(auth)/update-password');
+      return;
+    }
+
+    if (session && !isRecoveryMode && (inAuthArea || inOnboardingGroup)) {
       router.replace('/schedule');
       return;
     }
-  }, [isLoading, session, hasCompletedOnboarding, inOnboardingGroup, inAuthArea, inLegalGroup]);
+  }, [isLoading, session, hasCompletedOnboarding, inOnboardingGroup, inAuthArea, inLegalGroup, isRecoveryMode, inUpdatePasswordRoute]);
 
   // Always render the Stack so Expo Router's navigation tree is never torn down.
   // The loading overlay sits on top without unmounting the navigator.

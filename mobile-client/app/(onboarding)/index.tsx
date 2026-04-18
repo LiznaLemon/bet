@@ -7,14 +7,27 @@ import { ThemedText } from '@/components/themed-text';
 import { ONBOARDING_SLIDES } from '@/constants/onboarding-content';
 import { useOnboardingState } from '@/lib/onboarding-state';
 
+// Rough estimate of the non-slide chrome height (pagination + button row + gaps).
+// Used only to seed the initial slide-area height so the first render is already
+// laid out correctly; the actual height is corrected by onLayout below.
+const CHROME_HEIGHT_ESTIMATE = 8 /* container paddingTop extra */ + 20 /* container paddingBottom extra */ + 8 /* dot height */ + 18 /* pagination marginBottom */ + 52 /* button row height */;
+
 export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { completeOnboarding: persistOnboardingCompletion } = useOnboardingState();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+
+  // Seed the slide height from window metrics so the ScrollView (and all three
+  // slides + images) can mount on the first render, before the stack's slide-in
+  // animation begins. onLayout below trues it up if the estimate is off.
+  const estimatedSlideHeight = Math.max(
+    height - insets.top - insets.bottom - CHROME_HEIGHT_ESTIMATE,
+    320,
+  );
+  const [contentHeight, setContentHeight] = useState(estimatedSlideHeight);
 
   const activeSlide = ONBOARDING_SLIDES[index];
   const isLast = index === ONBOARDING_SLIDES.length - 1;
@@ -43,23 +56,29 @@ export default function OnboardingScreen() {
       ]}>
       <View
         style={styles.slideArea}
-        onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
-        {contentHeight > 0 && (
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={16}
-            onMomentumScrollEnd={(e) => {
-              const newIndex = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-              setIndex(newIndex);
-            }}
-            style={styles.pager}
-            contentContainerStyle={styles.pagerContent}>
-            {ONBOARDING_SLIDES.map((slide) => (
-              <View key={slide.id} style={{ width: pageWidth, height: contentHeight, paddingBottom: 24 }}>
-                {slide.layout === 'copy-top' ? (
+        onLayout={(e) => {
+          const measured = e.nativeEvent.layout.height;
+          // Only re-render if the measurement disagrees meaningfully with the
+          // seeded estimate. This avoids an extra render pass in the common case.
+          if (Math.abs(measured - contentHeight) > 1) {
+            setContentHeight(measured);
+          }
+        }}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={(e) => {
+            const newIndex = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+            setIndex(newIndex);
+          }}
+          style={styles.pager}
+          contentContainerStyle={styles.pagerContent}>
+          {ONBOARDING_SLIDES.map((slide) => (
+            <View key={slide.id} style={{ width: pageWidth, height: contentHeight, paddingBottom: 24 }}>
+              {slide.layout === 'copy-top' ? (
                   <>
                     <View style={styles.copyWrapTop}>
                       <View style={styles.badgePill}>
@@ -101,8 +120,7 @@ export default function OnboardingScreen() {
                 )}
               </View>
             ))}
-          </ScrollView>
-        )}
+        </ScrollView>
       </View>
 
       <View style={styles.pagination}>

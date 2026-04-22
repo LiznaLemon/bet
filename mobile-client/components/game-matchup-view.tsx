@@ -194,6 +194,7 @@ type GameMatchupViewProps = {
 
 const MARQUEE_PX_PER_MS = 0.05; // scroll speed
 const MARQUEE_FADE = 32;
+const MARQUEE_MIN_PLAYERS = 4;
 
 function injuryStatusColor(status: string, textSecondary: string, statusLive: string): string {
   const s = status.toLowerCase();
@@ -280,6 +281,53 @@ function InjuryMarquee({ injuries }: { injuries: ESPNInjuryEntry[] }) {
     </View>
   );
 }
+
+function InjuryStaticRow({ injuries }: { injuries: ESPNInjuryEntry[] }) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const { nameFormat } = useDisplayPreferences();
+  return (
+    <View style={staticRowStyles.row}>
+      {injuries.map((inj, i) => (
+        <View key={i} style={staticRowStyles.item}>
+          <PlayerAvatar uri={inj.headshotUrl} displayName={inj.playerName} teamAbbrev={inj.teamAbbrev} size={36} />
+          <View style={marqueeStyles.meta}>
+            <Text style={marqueeStyles.name} numberOfLines={1}>
+              <Text style={{ color: colors.text }}>{formatPlayerName(inj.playerName, nameFormat)}</Text>
+              {inj.teamAbbrev ? (
+                <Text style={[marqueeStyles.name, marqueeStyles.teamAbbrev, { color: colors.textSecondary }]}>
+                  {` (${inj.teamAbbrev})`}
+                </Text>
+              ) : null}
+            </Text>
+            <Text
+              style={[
+                marqueeStyles.status,
+                { color: injuryStatusColor(inj.status, colors.textSecondary, colors.statusLive) },
+              ]}
+              numberOfLines={1}>
+              {inj.status}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const staticRowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+});
 
 const marqueeStyles = StyleSheet.create({
   wrapper: {
@@ -460,43 +508,33 @@ function SidelinedGroupedLines({
       {teamGroups.map(({ teamAbbrev, players }) => {
         const verb = players.length === 1 ? 'is' : 'are';
         return (
-          <View key={teamAbbrev} style={summaryStyles.groupedLine}>
-            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>
-              <ThemedText style={[summaryStyles.bold, { color: textColor }]}>{teamAbbrev}{`'s`}</ThemedText>
-            </ThemedText>
+          <ThemedText key={teamAbbrev} style={[summaryStyles.paragraph, summaryStyles.groupedLine, { color: mutedColor }]}>
             {players.map((p, i) => {
               const isFirst = i === 0;
               const isLast = i === players.length - 1;
               const sep =
-                isFirst ? ' lead ' :
+                isFirst ? 'lead ' :
                 isLast && players.length === 2 ? ' and lead ' :
                 isLast ? ', and lead ' :
                 ', lead ';
               const rolesStr = joinLeadRoles(p.roles);
               return (
-                <View key={p.player.athlete_id} style={summaryStyles.inlineChunk}>
-                  <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>
-                    {sep + rolesStr + ' '}
+                <ThemedText key={p.player.athlete_id}>
+                  {isFirst && (
+                    <ThemedText style={[summaryStyles.bold, { color: textColor }]}>{teamAbbrev}{`'s `}</ThemedText>
+                  )}
+                  {sep + rolesStr + ' '}
+                  <ThemedText style={[summaryStyles.bold, summaryStyles.outAccent]}>
+                    {formatPlayerName(p.player.athlete_display_name, nameFormat)}
                   </ThemedText>
-                  <View style={summaryStyles.inlineMention}>
-                    <PlayerAvatar
-                      uri={p.player.athlete_headshot_href}
-                      displayName={p.player.athlete_display_name}
-                      teamAbbrev={p.player.team_abbreviation}
-                      size={22}
-                      style={summaryStyles.inlineAvatar}
-                    />
-                    <ThemedText style={[summaryStyles.paragraph, summaryStyles.bold, summaryStyles.outAccent]}>
-                      {formatPlayerName(p.player.athlete_display_name, nameFormat)}
-                    </ThemedText>
-                  </View>
-                </View>
+                  {' '}
+                </ThemedText>
               );
             })}
-            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>{` ${verb} `}</ThemedText>
-            <ThemedText style={[summaryStyles.paragraph, summaryStyles.bold, summaryStyles.outAccent]}>out</ThemedText>
-            <ThemedText style={[summaryStyles.paragraph, { color: mutedColor }]}>{'.'}</ThemedText>
-          </View>
+            {`${verb} `}
+            <ThemedText style={[summaryStyles.bold, summaryStyles.outAccent]}>out</ThemedText>
+            {'.'}
+          </ThemedText>
         );
       })}
     </>
@@ -627,14 +665,6 @@ const summaryStyles = StyleSheet.create({
     marginRight: 8,
   },
   groupedLine: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  inlineChunk: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
   },
   inlineMention: {
     flexDirection: 'row',
@@ -1403,7 +1433,10 @@ export function GameMatchupView({
         return (
           <View style={styles.sectionOpen}>
             <ThemedText style={styles.sectionTitle}>Injury Report</ThemedText>
-            <InjuryMarquee injuries={allInjuries} />
+            {allInjuries.length >= MARQUEE_MIN_PLAYERS
+              ? <InjuryMarquee injuries={allInjuries} />
+              : <InjuryStaticRow injuries={allInjuries} />
+            }
             {injurySnapshotLabel ? (
               <ThemedText style={[styles.dataFreshness, { color: colors.textSecondary }]}>
                 Injury report as of {injurySnapshotLabel}

@@ -10,7 +10,15 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
-/** Format date for display (e.g. "Today at 7:00 PM EDT") */
+/** Format game time in the user's local timezone for upcoming games; fall back to status string (e.g. "Final") for completed ones. */
+function formatLocalGameTime(game: ScheduleGame): string | null {
+  if (game.completed || !game.gameDateTime) return game.gameTime;
+  const d = new Date(game.gameDateTime);
+  if (isNaN(d.getTime())) return game.gameTime;
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Format date for display (e.g. "Today at 7:00 PM") */
 function formatDateLabel(game: ScheduleGame): string {
   const dateStr = game.gameDate;
   if (!dateStr) return game.gameTime || 'TBD';
@@ -22,8 +30,9 @@ function formatDateLabel(game: ScheduleGame): string {
   if (d.toDateString() === today.toDateString()) label = 'Today';
   else if (d.toDateString() === tomorrow.toDateString()) label = 'Tomorrow';
   else label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (game.completed) return game.gameTime ? `${label} - ${game.gameTime}` : label;
-  return game.gameTime ? `${label} at ${game.gameTime}` : label;
+  const timeStr = formatLocalGameTime(game);
+  if (game.completed) return timeStr ? `${label} - ${timeStr}` : label;
+  return timeStr ? `${label} at ${timeStr}` : label;
 }
 
 /** Ensure we only display a clean record string (e.g. "21-42"), never raw JSON/objects. */

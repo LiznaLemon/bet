@@ -4,6 +4,16 @@
  */
 
 /**
+ * Extract YYYY-MM-DD in America/New_York (NBA canonical date convention).
+ * ESPN timestamps are UTC; late-night games cross UTC midnight while still
+ * being on the prior calendar day in Eastern Time.
+ */
+function toEasternDateStr(dateStr) {
+  if (!dateStr) return null;
+  return new Date(dateStr).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+/**
  * Convert camelCase to snake_case
  */
 function toSnakeCase(str) {
@@ -56,8 +66,8 @@ export function parsePlayByPlay(json) {
   const season = header.season?.year;
   const seasonType = header.season?.type;
   const dateStr = competitions.date || '';
-  const gameDate = dateStr.slice(0, 10);
   const gameDateTime = dateStr ? new Date(dateStr).toISOString() : null;
+  const gameDate = toEasternDateStr(dateStr);
 
   const competitors = competitions.competitors || [];
   const homeIdx = competitors.findIndex((c) => c.homeAway === 'home');
@@ -263,8 +273,8 @@ export function parseScheduleFromSummary(json) {
 
   const status = competitions.status?.type || {};
   const dateStr = competitions.date || '';
-  const gameDate = dateStr.slice(0, 10);
   const gameDateTime = dateStr ? new Date(dateStr).toISOString() : null;
+  const gameDate = toEasternDateStr(dateStr);
 
   const homeTeam = homeComp.team || {};
   const awayTeam = awayComp.team || {};
@@ -340,7 +350,7 @@ export function parseScheduleFromScoreboardEvent(event) {
   const status = competition.status?.type || event?.status?.type || {};
   const startDate = competition.date || event?.date || '';
   const gameDateTime = startDate ? new Date(startDate).toISOString() : null;
-  const gameDate = gameDateTime ? gameDateTime.slice(0, 10) : null;
+  const gameDate = toEasternDateStr(startDate);
 
   const homeTeam = homeComp.team || {};
   const awayTeam = awayComp.team || {};
@@ -436,8 +446,8 @@ export function parseTeamBox(json) {
   const season = header.season?.year;
   const seasonType = header.season?.type;
   const dateStr = competitions.date || '';
-  const gameDate = dateStr.slice(0, 10);
   const gameDateTime = dateStr ? new Date(dateStr).toISOString() : null;
+  const gameDate = toEasternDateStr(dateStr);
 
   const competitors = competitions.competitors || [];
   const comp1 = competitors[0];
@@ -597,8 +607,8 @@ export function parsePlayerBox(json) {
   const season = header.season?.year;
   const seasonType = header.season?.type;
   const dateStr = competitions.date || '';
-  const gameDate = dateStr.slice(0, 10);
   const gameDateTime = dateStr ? new Date(dateStr).toISOString() : null;
+  const gameDate = toEasternDateStr(dateStr);
 
   const competitors = competitions.competitors || [];
   const comp1 = competitors[0];

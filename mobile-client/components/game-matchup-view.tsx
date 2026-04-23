@@ -194,7 +194,7 @@ type GameMatchupViewProps = {
 
 const MARQUEE_PX_PER_MS = 0.05; // scroll speed
 const MARQUEE_FADE = 32;
-const MARQUEE_MIN_PLAYERS = 4;
+const MARQUEE_MIN_PLAYERS = 3;
 
 function injuryStatusColor(status: string, textSecondary: string, statusLive: string): string {
   const s = status.toLowerCase();

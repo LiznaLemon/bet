@@ -393,7 +393,9 @@ function buildIntroParts(
   homeBackToBack: boolean | undefined,
   seasonSeriesSummaryText: string | null,
   awayB2BContext?: import('@/lib/types').B2BContext,
-  homeB2BContext?: import('@/lib/types').B2BContext
+  homeB2BContext?: import('@/lib/types').B2BContext,
+  isPlayoff?: boolean,
+  playoffSeriesSummaryText?: string | null
 ): SummarySpan[] {
   const spans: SummarySpan[] = [];
   const push = (text: string) => spans.push({ text });
@@ -401,69 +403,100 @@ function buildIntroParts(
 
   let sentences = 0;
 
-  const describeRecent = (abbrev: string, record: string | null | undefined, recent: typeof awayRecentResults) => {
+  const pushSeriesText = (text: string) => {
     if (sentences > 0) push(' ');
-    pushBold(abbrev);
-    if (record) { push(' ('); pushBold(record); push(')'); }
-    if (!recent || recent.results.length === 0) { push('.'); sentences++; return; }
-    let streak = 0;
-    const first = recent.results[0];
-    for (const r of recent.results) { if (r !== first) break; streak++; }
-    const wins = recent.results.filter((r) => r === 'W').length;
-    const n = recent.results.length;
-    if (streak >= n) {
-      const kind = first === 'W' ? 'winning' : 'losing';
-      push(' are on a ');
-      pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
-    } else if (streak >= 3) {
-      const kind = first === 'W' ? 'winning' : 'losing';
-      push(' are on a ');
-      pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
-      push(', going ');
-      pushBold(`${wins}-${n - wins}`);
-      push(` over their last ${n}`);
+    const match = text.match(/(\d+)[–\-](\d+)/);
+    if (match) {
+      const idx = text.indexOf(match[0]);
+      push(text.slice(0, idx));
+      pushBold(match[0]);
+      push(text.slice(idx + match[0].length));
     } else {
-      push(wins > n / 2 ? ' have won ' : wins < n / 2 ? ' have lost ' : ' split ');
-      pushBold(`${wins} of ${n}`);
-      push(' recent games');
+      push(text);
     }
-    push('.');
     sentences++;
   };
 
-  describeRecent(displayAwayAbbrev, awayRecord, awayRecentResults);
-  describeRecent(displayHomeAbbrev, homeRecord, homeRecentResults);
+  if (isPlayoff) {
+    // Playoffs: lead with series standing, skip recent form
+    if (playoffSeriesSummaryText) pushSeriesText(playoffSeriesSummaryText);
 
-  const b2bEntries: Array<{ abbrev: string; ctx: import('@/lib/types').B2BContext | undefined }> = [
-    ...(awayBackToBack ? [{ abbrev: displayAwayAbbrev, ctx: awayB2BContext }] : []),
-    ...(homeBackToBack ? [{ abbrev: displayHomeAbbrev, ctx: homeB2BContext }] : []),
-  ];
-  for (const { abbrev, ctx } of b2bEntries) {
-    if (sentences > 0) push(' ');
-    pushBold(abbrev);
-    push(' is playing back to back tonight');
-    if (ctx?.hasResult) {
-      const verb = ctx.won ? ' after beating ' : ' after losing to ';
-      const venue = ctx.wasHome ? ' at home' : ' on the road';
-      push(verb);
-      pushBold(ctx.opponentAbbrev);
-      push(venue);
+    const b2bEntries: Array<{ abbrev: string; ctx: import('@/lib/types').B2BContext | undefined }> = [
+      ...(awayBackToBack ? [{ abbrev: displayAwayAbbrev, ctx: awayB2BContext }] : []),
+      ...(homeBackToBack ? [{ abbrev: displayHomeAbbrev, ctx: homeB2BContext }] : []),
+    ];
+    for (const { abbrev, ctx } of b2bEntries) {
+      if (sentences > 0) push(' ');
+      pushBold(abbrev);
+      push(' is playing back to back tonight');
+      if (ctx?.hasResult) {
+        const verb = ctx.won ? ' after beating ' : ' after losing to ';
+        const venue = ctx.wasHome ? ' at home' : ' on the road';
+        push(verb);
+        pushBold(ctx.opponentAbbrev);
+        push(venue);
+      }
+      push('.');
+      sentences++;
     }
-    push('.');
-    sentences++;
-  }
 
-  if (seasonSeriesSummaryText) {
-    if (sentences > 0) push(' ');
-    const match = seasonSeriesSummaryText.match(/(\d+)[–\-](\d+)/);
-    if (match) {
-      const idx = seasonSeriesSummaryText.indexOf(match[0]);
-      push(seasonSeriesSummaryText.slice(0, idx));
-      pushBold(match[0]);
-      push(seasonSeriesSummaryText.slice(idx + match[0].length));
-    } else {
-      push(seasonSeriesSummaryText);
+    // Regular season series as secondary historical note
+    if (seasonSeriesSummaryText) pushSeriesText(seasonSeriesSummaryText);
+  } else {
+    // Regular season: recent form per team
+    const describeRecent = (abbrev: string, record: string | null | undefined, recent: typeof awayRecentResults) => {
+      if (sentences > 0) push(' ');
+      pushBold(abbrev);
+      if (record) { push(' ('); pushBold(record); push(')'); }
+      if (!recent || recent.results.length === 0) { push('.'); sentences++; return; }
+      let streak = 0;
+      const first = recent.results[0];
+      for (const r of recent.results) { if (r !== first) break; streak++; }
+      const wins = recent.results.filter((r) => r === 'W').length;
+      const n = recent.results.length;
+      if (streak >= n) {
+        const kind = first === 'W' ? 'winning' : 'losing';
+        push(' are on a ');
+        pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
+      } else if (streak >= 3) {
+        const kind = first === 'W' ? 'winning' : 'losing';
+        push(' are on a ');
+        pushBold(`${streak}-game ${kind} streak`, first === 'W' ? '#4caf50' : '#e05252');
+        push(', going ');
+        pushBold(`${wins}-${n - wins}`);
+        push(` over their last ${n}`);
+      } else {
+        push(wins > n / 2 ? ' have won ' : wins < n / 2 ? ' have lost ' : ' split ');
+        pushBold(`${wins} of ${n}`);
+        push(' recent games');
+      }
+      push('.');
+      sentences++;
+    };
+
+    describeRecent(displayAwayAbbrev, awayRecord, awayRecentResults);
+    describeRecent(displayHomeAbbrev, homeRecord, homeRecentResults);
+
+    const b2bEntries: Array<{ abbrev: string; ctx: import('@/lib/types').B2BContext | undefined }> = [
+      ...(awayBackToBack ? [{ abbrev: displayAwayAbbrev, ctx: awayB2BContext }] : []),
+      ...(homeBackToBack ? [{ abbrev: displayHomeAbbrev, ctx: homeB2BContext }] : []),
+    ];
+    for (const { abbrev, ctx } of b2bEntries) {
+      if (sentences > 0) push(' ');
+      pushBold(abbrev);
+      push(' is playing back to back tonight');
+      if (ctx?.hasResult) {
+        const verb = ctx.won ? ' after beating ' : ' after losing to ';
+        const venue = ctx.wasHome ? ' at home' : ' on the road';
+        push(verb);
+        pushBold(ctx.opponentAbbrev);
+        push(venue);
+      }
+      push('.');
+      sentences++;
     }
+
+    if (seasonSeriesSummaryText) pushSeriesText(seasonSeriesSummaryText);
   }
 
   return spans;
@@ -549,6 +582,8 @@ function MatchupSummarySection({
   homeRecentResults,
   sidelinedStatLeaderLines,
   seasonSeriesSummaryText,
+  isPlayoff,
+  playoffSeriesSummaryText,
   textColor,
   mutedColor,
   nameFormat,
@@ -561,6 +596,8 @@ function MatchupSummarySection({
   homeRecentResults: { wins: number; losses: number; results: ('W' | 'L')[] } | undefined;
   sidelinedStatLeaderLines: SidelinedLine[];
   seasonSeriesSummaryText: string | null;
+  isPlayoff: boolean;
+  playoffSeriesSummaryText: string | null;
   textColor: string;
   mutedColor: string;
   nameFormat: 'full' | 'initial_last';
@@ -577,7 +614,9 @@ function MatchupSummarySection({
     game.homeBackToBack,
     seasonSeriesSummaryText,
     game.awayB2BContext,
-    game.homeB2BContext
+    game.homeB2BContext,
+    isPlayoff,
+    playoffSeriesSummaryText
   );
 
   if (introSpans.length === 0 && sidelinedStatLeaderLines.length === 0) {
@@ -829,39 +868,61 @@ export function GameMatchupView({
     setPreviousMatchupExpanded(false);
   }, [game.id]);
 
-  const seasonSeriesRecord = useMemo(() => {
-    if (!previousMatchups.length) return null;
+  const isPlayoff = game.seasonType === 3;
+
+  const computeSeriesRecord = (games: ScheduleGame[]) => {
     const away = displayAwayAbbrev;
-    const home = displayHomeAbbrev;
     let awayWins = 0;
     let homeWins = 0;
-    for (const g of previousMatchups) {
+    for (const g of games) {
       if (g.awayScore == null || g.homeScore == null) continue;
       const gAway = toThreeLetterAbbrev((g.awayTeamAbbrev ?? '').toUpperCase().trim());
-      const gHome = toThreeLetterAbbrev((g.homeTeamAbbrev ?? '').toUpperCase().trim());
       if (gAway === away) {
         if (g.awayScore > g.homeScore) awayWins++;
         else homeWins++;
-      } else if (gHome === away) {
+      } else {
         if (g.homeScore > g.awayScore) awayWins++;
         else homeWins++;
       }
     }
     return { awayWins, homeWins };
-  }, [previousMatchups, displayAwayAbbrev, displayHomeAbbrev]);
+  };
+
+  const { playoffMatchups, regularSeasonMatchups } = useMemo(() => {
+    const playoff = previousMatchups.filter((g) => g.seasonType === 3);
+    const regular = previousMatchups.filter((g) => g.seasonType === 2);
+    return { playoffMatchups: playoff, regularSeasonMatchups: regular };
+  }, [previousMatchups]);
+
+  const playoffSeriesSummaryText = useMemo(() => {
+    if (!isPlayoff || !playoffMatchups.length) return null;
+    const { awayWins, homeWins } = computeSeriesRecord(playoffMatchups);
+    const a = displayAwayAbbrev;
+    const h = displayHomeAbbrev;
+    if (awayWins === homeWins) return `Series tied ${awayWins}–${homeWins}.`;
+    if (awayWins > homeWins) return `${a} leads the series ${awayWins}–${homeWins}.`;
+    return `${h} leads the series ${homeWins}–${awayWins}.`;
+  }, [isPlayoff, playoffMatchups, displayAwayAbbrev, displayHomeAbbrev]);
 
   const summaryLoading = matchupContextLoading || previousMatchupsLoading;
 
   const seasonSeriesSummaryText = useMemo(() => {
-    if (!seasonSeriesRecord) return null;
-    const { awayWins, homeWins } = seasonSeriesRecord;
+    const games = isPlayoff ? regularSeasonMatchups : previousMatchups;
+    if (!games.length) return null;
+    const { awayWins, homeWins } = computeSeriesRecord(games);
     const a = displayAwayAbbrev;
     const h = displayHomeAbbrev;
     if (awayWins === 0 && homeWins === 0) return null;
+    if (isPlayoff) {
+      // Past tense — regular season context during playoffs
+      if (awayWins === homeWins) return `${a} and ${h} split the regular season series ${awayWins}–${homeWins}.`;
+      if (awayWins > homeWins) return `${a} led the regular season series ${awayWins}–${homeWins}.`;
+      return `${h} led the regular season series ${homeWins}–${awayWins}.`;
+    }
     if (awayWins === homeWins) return `${a} and ${h} split the season series ${awayWins}–${homeWins}.`;
     if (awayWins > homeWins) return `${a} leads the season series ${awayWins}–${homeWins}.`;
     return `${h} leads the season series ${homeWins}–${awayWins}.`;
-  }, [seasonSeriesRecord, displayAwayAbbrev, displayHomeAbbrev]);
+  }, [isPlayoff, playoffMatchups, regularSeasonMatchups, previousMatchups, displayAwayAbbrev, displayHomeAbbrev]);
 
   // Map normalized player name → headshot URL, used to fill in null headshotUrls
   // on injury entries sourced from the DB backfill (PDFs don't include headshots).
@@ -1392,6 +1453,8 @@ export function GameMatchupView({
         homeRecentResults={homeRecentResults}
         sidelinedStatLeaderLines={sidelinedStatLeaderLines}
         seasonSeriesSummaryText={seasonSeriesSummaryText}
+        isPlayoff={isPlayoff}
+        playoffSeriesSummaryText={playoffSeriesSummaryText}
         textColor={colors.text}
         mutedColor={colors.textSecondary}
         nameFormat={nameFormat}

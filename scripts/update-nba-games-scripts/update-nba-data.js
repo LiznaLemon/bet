@@ -8,7 +8,13 @@
  *   node update-nba-data.js [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--mode auto|playoff|regular|offseason] [--dry-run]
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Load .env.local from the bet repo root; fall back to a local .env
+config({ path: resolve(__dirname, '../../.env.local') });
+config();
 import { randomUUID } from 'node:crypto';
 import { fetchScoreboardAllEvents, fetchGameSummary } from './espn-api.js';
 import {

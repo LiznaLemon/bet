@@ -64,19 +64,18 @@ export default function SettingsScreen() {
         </ThemedText>
       </View>
 
-      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+      <View style={styles.accountSection}>
         <ThemedText style={styles.sectionTitle}>Account</ThemedText>
         <ThemedText style={[styles.sectionDescription, { color: colors.textSecondary }]}>
           Sign out of your account on this device.
         </ThemedText>
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Log out"
           disabled={isLoading}
           onPress={() => void handleSignOut()}
           style={({ pressed }) => [
-            styles.signOutButton,
+            styles.button,
             { borderColor: colors.tint },
             pressed && !isLoading ? styles.buttonPressed : null,
             isLoading ? styles.buttonDisabled : null,
@@ -84,23 +83,25 @@ export default function SettingsScreen() {
           {isSigningOut ? (
             <ActivityIndicator color={colors.tint} size="small" />
           ) : (
-            <ThemedText style={[styles.signOutText, { color: colors.tint }]}>Log out</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: colors.tint }]}>Log out</ThemedText>
           )}
         </Pressable>
+      </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
+      <View style={[styles.card, styles.dangerCard, { backgroundColor: colors.cardBackground, borderColor: colors.statusLive }]}>
+        <ThemedText style={[styles.sectionTitle, { color: colors.statusLive }]}>Danger Zone</ThemedText>
         <ThemedText style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-          Permanently delete your account and all associated data.
+          Permanently delete your account and all associated data. This action cannot be undone.
         </ThemedText>
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Delete account"
           disabled={isLoading}
           onPress={confirmDeleteAccount}
           style={({ pressed }) => [
-            styles.deleteButton,
+            styles.button,
             { borderColor: colors.statusLive },
             pressed && !isLoading ? styles.buttonPressed : null,
             isLoading ? styles.buttonDisabled : null,
@@ -108,10 +109,9 @@ export default function SettingsScreen() {
           {isDeletingAccount ? (
             <ActivityIndicator color={colors.statusLive} size="small" />
           ) : (
-            <ThemedText style={[styles.deleteText, { color: colors.statusLive }]}>Delete Account</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: colors.statusLive }]}>Delete Account</ThemedText>
           )}
         </Pressable>
-
         {errorMessage ? (
           <ThemedText style={[styles.errorText, { color: colors.textSecondary }]}>{errorMessage}</ThemedText>
         ) : null}
@@ -133,15 +133,21 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 4,
+  accountSection: {
+    gap: 12,
+    paddingBottom: 28,
+  },
+  divider: {
+    height: 1,
   },
   card: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 18,
     gap: 12,
+  },
+  dangerCard: {
+    marginTop: 28,
   },
   sectionTitle: {
     fontSize: 18,
@@ -151,11 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  divider: {
-    height: 1,
-    marginVertical: 4,
-  },
-  signOutButton: {
+  button: {
     minHeight: 46,
     borderRadius: 12,
     borderWidth: 1,
@@ -163,24 +165,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  deleteButton: {
-    minHeight: 46,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   buttonPressed: {
     opacity: 0.8,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
-  signOutText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  deleteText: {
+  buttonText: {
     fontSize: 15,
     fontWeight: '600',
   },

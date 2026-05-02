@@ -268,7 +268,6 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 3,
-    minHeight: 36,
   },
   recordText: {
     textAlign: 'center',

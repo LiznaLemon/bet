@@ -48,11 +48,12 @@ function GameCard({
   scheduleGames: ScheduleGame[];
   liveLabel?: string;
 }) {
+  const colors = Colors[colorScheme];
   return (
     <Pressable
       style={({ pressed }) => [
         styles.gameCard,
-        { borderColor: Colors[colorScheme].dividerSubtle },
+        { borderColor: colors.dividerSubtle },
         pressed && styles.gameCardPressed,
       ]}
       onPress={() => router.push(`/game/${game.id}`)}>
@@ -63,6 +64,15 @@ function GameCard({
           scheduleGames={scheduleGames}
           liveLabel={liveLabel}
         />
+      </View>
+      <View style={[styles.cardFooterDivider, { backgroundColor: colors.dividerSubtle }]} />
+      <View style={styles.cardFooter}>
+        <ThemedText style={[styles.cardFooterLabel, { color: colors.textSecondary }]}>
+          Game Details
+        </ThemedText>
+        <View style={[styles.cardFooterCircle, { borderColor: colors.dividerSubtle }]}>
+          <ThemedText style={[styles.cardFooterChevron, { color: colors.textSecondary }]}>›</ThemedText>
+        </View>
       </View>
     </Pressable>
   );
@@ -265,6 +275,35 @@ const styles = StyleSheet.create({
   },
   gameCardPressed: {
     opacity: 0.9,
+  },
+  cardFooterDivider: {
+    height: 1,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  cardFooterLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  cardFooterCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardFooterChevron: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   stateContainer: {
     flex: 1,

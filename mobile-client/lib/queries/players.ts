@@ -5,7 +5,7 @@ import type { GameLogEntry, Player } from '@/lib/types';
 
 const FETCH_TIMEOUT_MS = 15000;
 
-export async function fetchPlayers(season: number): Promise<Player[]> {
+export async function fetchPlayers(season: number, seasonType = 2): Promise<Player[]> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('Request timed out. Check your network connection.')), FETCH_TIMEOUT_MS);
   });
@@ -13,7 +13,7 @@ export async function fetchPlayers(season: number): Promise<Player[]> {
   const fetchPromise = (async () => {
     const { data, error } = await supabase.rpc('get_players_enhanced', {
       p_season: season,
-      p_season_type: 2,
+      p_season_type: seasonType,
     });
 
     if (error) {
@@ -27,10 +27,10 @@ export async function fetchPlayers(season: number): Promise<Player[]> {
   return Promise.race([fetchPromise, timeoutPromise]);
 }
 
-export function usePlayers(season = 2026) {
+export function usePlayers(season = 2026, seasonType = 2) {
   return useQuery({
-    queryKey: ['players', season],
-    queryFn: () => fetchPlayers(season),
+    queryKey: ['players', season, seasonType],
+    queryFn: () => fetchPlayers(season, seasonType),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,
@@ -104,11 +104,12 @@ async function fetchPlayersPaginated(
   season: number,
   search: string | null,
   sortBy: string,
-  offset: number
+  offset: number,
+  seasonType = 2
 ): Promise<PaginatedPlayersPage> {
   const { data, error } = await supabase.rpc('get_players_paginated', {
     p_season: season,
-    p_season_type: 2,
+    p_season_type: seasonType,
     p_search: search || null,
     p_sort_by: sortBy,
     p_sort_dir: 'desc',
@@ -133,12 +134,13 @@ export function usePlayersPaginated(
   season: number,
   search: string,
   sortBy: string,
+  seasonType = 2,
   enabled = true
 ) {
   return useInfiniteQuery({
-    queryKey: ['players-paginated', season, search || null, sortBy],
+    queryKey: ['players-paginated', season, seasonType, search || null, sortBy],
     queryFn: ({ pageParam = 0 }) =>
-      fetchPlayersPaginated(season, search, sortBy, pageParam),
+      fetchPlayersPaginated(season, search, sortBy, pageParam, seasonType),
     initialPageParam: 0,
     getNextPageParam: (lastPage: PaginatedPlayersPage) => lastPage.nextOffset,
     staleTime: 5 * 60 * 1000,
@@ -163,12 +165,13 @@ export function prefetchPlayersFirstPage(season = 2026, sortBy = 'ppg') {
 export async function fetchPlayerGameLog(
   athleteId: string,
   season: number,
+  seasonType = 2,
   limit = 82
 ): Promise<GameLogEntry[]> {
   const { data, error } = await supabase.rpc('get_player_game_log', {
     p_athlete_id: athleteId,
     p_season: season,
-    p_season_type: 2,
+    p_season_type: seasonType,
     p_limit: limit,
   });
 
@@ -179,11 +182,12 @@ export async function fetchPlayerGameLog(
 export function usePlayerGameLog(
   athleteId: string | undefined,
   season = 2026,
+  seasonType = 2,
   limit = 82
 ) {
   return useQuery({
-    queryKey: ['player-game-log', athleteId, season, limit],
-    queryFn: () => fetchPlayerGameLog(athleteId!, season, limit),
+    queryKey: ['player-game-log', athleteId, season, seasonType, limit],
+    queryFn: () => fetchPlayerGameLog(athleteId!, season, seasonType, limit),
     enabled: !!athleteId,
     staleTime: 5 * 60 * 1000,
   });

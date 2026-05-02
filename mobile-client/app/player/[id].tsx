@@ -753,12 +753,14 @@ export default function PlayerDetailScreen() {
   const { nameFormat } = useDisplayPreferences();
   const backLabel = from || 'Players';
   const headerHeight = useHeaderHeight();
-  const { data: playersData = [], isLoading: playersLoading, isError: playersError, refetch: refetchPlayers } = usePlayers();
-  const { data: scheduleData = [] } = useSchedule();
-  const { data: fetchedShots = [], isLoading: shotsLoading } = useShots(id, 2026);
 
+  const [seasonType, setSeasonType] = useState<2 | 3>(2);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('season');
   const [chartStat, setChartStat] = useState<ChartStatKey>('points');
+
+  const { data: playersData = [], isLoading: playersLoading, isError: playersError, refetch: refetchPlayers } = usePlayers(2026, seasonType);
+  const { data: scheduleData = [] } = useSchedule();
+  const { data: fetchedShots = [], isLoading: shotsLoading } = useShots(id, 2026);
 
   // Fade in the full screen when player data first arrives
   const screenOpacity = useSharedValue(0);
@@ -875,6 +877,31 @@ export default function PlayerDetailScreen() {
     );
   }
 
+  if (!player && seasonType === 3 && !playersLoading) {
+    return (
+      <>
+        <Stack.Screen options={{ title: name ?? 'Player', headerLeft }} />
+        <ThemedView style={[styles.container, styles.centerContent, { paddingTop: headerHeight }]}>
+          <View style={{ marginBottom: 24 }}>
+            <FilterOptionButtons
+              options={[
+                { key: '2', label: 'Regular Season' },
+                { key: '3', label: 'Playoffs' },
+              ]}
+              value={String(seasonType)}
+              onSelect={(key) => setSeasonType(Number(key) as 2 | 3)}
+              colorScheme={colorScheme ?? 'light'}
+            />
+          </View>
+          <ThemedText style={[styles.errorText, { fontSize: 16 }]}>No playoff stats available</ThemedText>
+          <ThemedText style={[styles.retryButtonText, { color: colors.textSecondary, fontWeight: 'normal', marginTop: 8, textAlign: 'center' }]}>
+            {name ?? 'This player'} did not play in the 2026 playoffs.
+          </ThemedText>
+        </ThemedView>
+      </>
+    );
+  }
+
   if (!player) {
     return (
       <>
@@ -952,7 +979,16 @@ export default function PlayerDetailScreen() {
           <View style={styles.filterRow}>
             <FilterOptionButtons
               options={[
-                { key: 'season', label: 'Season' },
+                { key: '2', label: 'Regular Season' },
+                { key: '3', label: 'Playoffs' },
+              ]}
+              value={String(seasonType)}
+              onSelect={(key) => setSeasonType(Number(key) as 2 | 3)}
+              colorScheme={colorScheme ?? 'light'}
+            />
+            <FilterOptionButtons
+              options={[
+                { key: 'season', label: 'All Games' },
                 { key: 'last_10', label: 'Last 10 Games' },
                 { key: 'last_5', label: 'Last 5 Games' },
               ]}

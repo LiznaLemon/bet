@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFadeTransition } from '@/hooks/use-fade-transition';
 import { usePlayersPaginated, type PaginatedPlayer } from '@/lib/queries/players';
 import type { Player } from '@/lib/types';
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -32,6 +32,7 @@ export default function PlayersScreen() {
   const colors = Colors[colorScheme];
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('ppg');
+  const [seasonType, setSeasonType] = useState<2 | 3>(2);
   const deferredSortBy = useDeferredValue(sortBy);
 
   const {
@@ -44,7 +45,7 @@ export default function PlayersScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePlayersPaginated(SEASON, searchQuery, deferredSortBy);
+  } = usePlayersPaginated(SEASON, searchQuery, deferredSortBy, seasonType);
 
   const playersData: PaginatedPlayer[] = useMemo(
     () => paginatedData?.pages.flatMap((p) => p.players) ?? [],
@@ -62,6 +63,12 @@ export default function PlayersScreen() {
   const triggerCounterRef = useRef(0);
   const hasAnimatedRef = useRef<Record<string, boolean>>({});
   const [animationVersion, setAnimationVersion] = useState(0);
+
+  useEffect(() => {
+    triggerMapRef.current = {};
+    hasAnimatedRef.current = {};
+    setAnimationVersion(v => v + 1);
+  }, [seasonType]);
 
   // Trigger bar chart animation only when item first enters viewport
   const onViewableItemsChanged = useCallback(
@@ -134,9 +141,11 @@ export default function PlayersScreen() {
       {/* Header */}
       <View style={styles.header}>
         <ThemedText type="title" style={styles.title}>
-          NBA Players
+          Players
         </ThemedText>
-        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>2026 Season Averages</ThemedText>
+        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
+          {seasonType === 2 ? '2026 Regular Season Averages' : '2026 Playoff Averages'}
+        </ThemedText>
       </View>
 
       {/* Search Bar */}
@@ -153,6 +162,19 @@ export default function PlayersScreen() {
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
+      {/* Season Type Toggle */}
+      <View style={styles.seasonTypeContainer}>
+        <ThemedText style={[styles.sortLabel, { color: colors.textSecondary }]}>Filter by:</ThemedText>
+        <FilterOptionButtons
+          options={[
+            { key: '2', label: 'Regular Season' },
+            { key: '3', label: 'Playoffs' },
+          ]}
+          value={String(seasonType)}
+          onSelect={(key) => setSeasonType(Number(key) as 2 | 3)}
+          colorScheme={colorScheme}
+        />
+      </View>
       {/* Sort Options */}
       <View style={[styles.sortContainer, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
         <ThemedText style={[styles.sortLabel, { color: colors.textSecondary }]}>Sort by:</ThemedText>
@@ -243,7 +265,11 @@ export default function PlayersScreen() {
               ListEmptyComponent={
                 <View style={styles.centerMessage}>
                   <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    {searchQuery ? 'No players match your search' : 'No players found'}
+                    {searchQuery
+                      ? 'No players match your search'
+                      : seasonType === 3
+                        ? 'No playoff stats available yet'
+                        : 'No players found'}
                   </ThemedText>
                 </View>
               }
@@ -279,6 +305,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     fontSize: 16,
+  },
+  seasonTypeContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
   sortContainer: {
     paddingHorizontal: 20,

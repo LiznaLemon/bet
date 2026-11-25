@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // This route exists purely as the Stack's anchor/initial route. It renders a
-// neutral loading state and intentionally does NOT redirect — AuthGate in
+// neutral loading state and intentionally does NOT redirect — AppGate in
 // _layout.tsx is the single source of truth for post-hydration routing. This
 // avoids a double-navigation race with AuthGate on cold launch.
 export default function IndexScreen() {

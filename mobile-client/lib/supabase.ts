@@ -15,16 +15,12 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
+// The app has no user accounts: every request uses the public anon key, so no
+// auth session is stored or refreshed.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: typeof localStorage !== 'undefined' ? localStorage : undefined,
-    autoRefreshToken: true,
-    persistSession: true,
+    persistSession: false,
+    autoRefreshToken: false,
     detectSessionInUrl: false,
-    // PKCE ensures the email link contains a short-lived `code` that can only be
-    // exchanged by the device that generated the code_verifier. This prevents
-    // email scanners / link previewers from burning the one-time token before
-    // the user taps the link (which was showing up as otp_expired on first tap).
-    flowType: 'pkce',
   },
 });

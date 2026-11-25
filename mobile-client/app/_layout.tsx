@@ -9,7 +9,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider, useAuth } from '@/lib/auth';
 import { DisplayPreferencesProvider } from '@/lib/display-preferences';
 import { OnboardingStateProvider, useOnboardingState } from '@/lib/onboarding-state';
 import {
@@ -25,7 +24,7 @@ export const unstable_settings = {
   anchor: 'index',
 };
 
-// Hold the native splash open until AuthGate has hydrated state and (if the
+// Hold the native splash open until AppGate has hydrated state and (if the
 // user is heading to onboarding) until the onboarding images have decoded.
 // This covers the cold-launch stack transition behind the splash so the user
 // never sees a mid-animation hang — they go straight from splash to the
@@ -38,60 +37,36 @@ loadTeamAbbreviations();
 prefetchPlayersFirstPage(2026, 'ppg');
 prefetchOnboardingAssets();
 
-function AuthGate() {
+function AppGate() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const segments = useSegments();
-  const { session, isAuthLoading, isHandlingAuthCallback, isProfileLoading, isRecoveryMode } = useAuth();
   const { hasCompletedOnboarding, isOnboardingHydrating } = useOnboardingState();
 
   const topSegment = segments[0];
-  const secondSegment = segments[1];
-  const inAuthGroup = topSegment === '(auth)';
-  const inAuthCallbackRoute = topSegment === 'auth';
-  const inAuthArea = inAuthGroup || inAuthCallbackRoute;
   const inOnboardingGroup = topSegment === '(onboarding)';
   const inLegalGroup = topSegment === 'legal';
-  const inUpdatePasswordRoute = secondSegment === 'update-password';
 
-  const isLoading =
-    isAuthLoading || isOnboardingHydrating || isHandlingAuthCallback || (!!session && isProfileLoading);
+  const isLoading = isOnboardingHydrating;
 
   useEffect(() => {
     if (isLoading) return;
 
-    if (!session && !hasCompletedOnboarding && !inOnboardingGroup && !inAuthArea && !inLegalGroup) {
+    if (!hasCompletedOnboarding && !inOnboardingGroup && !inLegalGroup) {
       router.replace('/(onboarding)');
       return;
     }
 
-    if (!session && hasCompletedOnboarding && !inAuthArea && !inLegalGroup) {
-      router.replace('/(auth)/sign-up');
-      return;
-    }
-
-    if (!session && hasCompletedOnboarding && inOnboardingGroup) {
-      router.replace('/(auth)/sign-up');
-      return;
-    }
-
-    if (session && isRecoveryMode && !inUpdatePasswordRoute) {
-      router.replace('/(auth)/update-password');
-      return;
-    }
-
-    // `!topSegment` covers the anchor `/` (index) route: on cold reopen with a
-    // persisted session we land there because `index.tsx` is a neutral spinner
-    // that intentionally does not self-redirect. Without this, AuthGate has no
-    // branch that matches and the user is stranded on the spinner forever.
-    if (session && !isRecoveryMode && (inAuthArea || inOnboardingGroup || !topSegment)) {
+    // `!topSegment` covers the anchor `/` (index) route: index.tsx is a neutral
+    // spinner that intentionally does not self-redirect, so this gate owns it.
+    if (hasCompletedOnboarding && (inOnboardingGroup || !topSegment)) {
       router.replace('/schedule');
       return;
     }
-  }, [isLoading, session, hasCompletedOnboarding, inOnboardingGroup, inAuthArea, inLegalGroup, isRecoveryMode, inUpdatePasswordRoute]);
+  }, [isLoading, hasCompletedOnboarding, inOnboardingGroup, inLegalGroup, topSegment]);
 
   // Hide the native splash screen once all critical cold-launch work is done:
-  // (1) auth + onboarding state has hydrated, (2) if the user is headed to the
+  // (1) onboarding state has hydrated, (2) if the user is headed to the
   // onboarding flow, the onboarding images have also been decoded. Two nested
   // requestAnimationFrames give expo-router's router.replace() a chance to
   // commit the destination route natively before the splash fades — otherwise
@@ -101,7 +76,7 @@ function AuthGate() {
     if (isLoading) return;
 
     let cancelled = false;
-    const goingToOnboarding = !session && !hasCompletedOnboarding;
+    const goingToOnboarding = !hasCompletedOnboarding;
     const ready = goingToOnboarding ? whenOnboardingAssetsReady() : Promise.resolve();
 
     void ready.finally(() => {
@@ -116,7 +91,7 @@ function AuthGate() {
     return () => {
       cancelled = true;
     };
-  }, [isLoading, session, hasCompletedOnboarding]);
+  }, [isLoading, hasCompletedOnboarding]);
 
   // Always render the Stack so Expo Router's navigation tree is never torn down.
   // The loading overlay sits on top without unmounting the navigator.
@@ -124,8 +99,6 @@ function AuthGate() {
     <>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen
           name="(onboarding)"
           // Use a fade instead of the default iOS slide for the app's first
@@ -169,16 +142,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <OnboardingStateProvider>
-            <DisplayPreferencesProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <AuthGate />
-                <StatusBar style="auto" />
-              </ThemeProvider>
-            </DisplayPreferencesProvider>
-          </OnboardingStateProvider>
-        </AuthProvider>
+        <OnboardingStateProvider>
+          <DisplayPreferencesProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AppGate />
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </DisplayPreferencesProvider>
+        </OnboardingStateProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

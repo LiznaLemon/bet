@@ -1,60 +1,19 @@
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/lib/auth';
+
+const LEGAL_LINKS: { label: string; href: Href }[] = [
+  { label: 'Terms of Use', href: '/legal/terms' },
+  { label: 'Privacy Policy', href: '/legal/privacy' },
+];
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { signOut, deleteAccount } = useAuth();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  async function handleSignOut() {
-    setErrorMessage(null);
-    setIsSigningOut(true);
-
-    try {
-      await signOut();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Could not sign out');
-      setIsSigningOut(false);
-    }
-  }
-
-  function confirmDeleteAccount() {
-    Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account and all associated data. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => void handleDeleteAccount(),
-        },
-      ],
-    );
-  }
-
-  async function handleDeleteAccount() {
-    setErrorMessage(null);
-    setIsDeletingAccount(true);
-
-    try {
-      await deleteAccount();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Could not delete account');
-      setIsDeletingAccount(false);
-    }
-  }
-
-  const isLoading = isSigningOut || isDeletingAccount;
 
   return (
     <ThemedView style={styles.container}>
@@ -64,57 +23,22 @@ export default function SettingsScreen() {
         </ThemedText>
       </View>
 
-      <View style={styles.accountSection}>
-        <ThemedText style={styles.sectionTitle}>Account</ThemedText>
-        <ThemedText style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-          Sign out of your account on this device.
-        </ThemedText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Log out"
-          disabled={isLoading}
-          onPress={() => void handleSignOut()}
-          style={({ pressed }) => [
-            styles.button,
-            { borderColor: colors.tint },
-            pressed && !isLoading ? styles.buttonPressed : null,
-            isLoading ? styles.buttonDisabled : null,
-          ]}>
-          {isSigningOut ? (
-            <ActivityIndicator color={colors.tint} size="small" />
-          ) : (
-            <ThemedText style={[styles.buttonText, { color: colors.tint }]}>Log out</ThemedText>
-          )}
-        </Pressable>
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-      <View style={[styles.card, styles.dangerCard, { backgroundColor: colors.cardBackground, borderColor: colors.statusLive }]}>
-        <ThemedText style={[styles.sectionTitle, { color: colors.statusLive }]}>Danger Zone</ThemedText>
-        <ThemedText style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-          Permanently delete your account and all associated data. This action cannot be undone.
-        </ThemedText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Delete account"
-          disabled={isLoading}
-          onPress={confirmDeleteAccount}
-          style={({ pressed }) => [
-            styles.button,
-            { borderColor: colors.statusLive },
-            pressed && !isLoading ? styles.buttonPressed : null,
-            isLoading ? styles.buttonDisabled : null,
-          ]}>
-          {isDeletingAccount ? (
-            <ActivityIndicator color={colors.statusLive} size="small" />
-          ) : (
-            <ThemedText style={[styles.buttonText, { color: colors.statusLive }]}>Delete Account</ThemedText>
-          )}
-        </Pressable>
-        {errorMessage ? (
-          <ThemedText style={[styles.errorText, { color: colors.textSecondary }]}>{errorMessage}</ThemedText>
-        ) : null}
+      <View style={styles.section}>
+        <ThemedText style={styles.sectionTitle}>Legal</ThemedText>
+        {LEGAL_LINKS.map((link) => (
+          <Pressable
+            key={link.label}
+            accessibilityRole="link"
+            accessibilityLabel={link.label}
+            onPress={() => router.push(link.href)}
+            style={({ pressed }) => [
+              styles.button,
+              { borderColor: colors.border },
+              pressed ? styles.buttonPressed : null,
+            ]}>
+            <ThemedText style={[styles.buttonText, { color: colors.tint }]}>{link.label}</ThemedText>
+          </Pressable>
+        ))}
       </View>
     </ThemedView>
   );
@@ -133,29 +57,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
-  accountSection: {
+  section: {
     gap: 12,
-    paddingBottom: 28,
-  },
-  divider: {
-    height: 1,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 18,
-    gap: 12,
-  },
-  dangerCard: {
-    marginTop: 28,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-  },
-  sectionDescription: {
-    fontSize: 14,
-    lineHeight: 20,
   },
   button: {
     minHeight: 46,
@@ -163,19 +70,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
   buttonPressed: {
     opacity: 0.8,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
   buttonText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  errorText: {
-    fontSize: 13,
   },
 });

@@ -1,4 +1,4 @@
-export const LEGAL_VERSION = '2026-04-15';
+export const LEGAL_VERSION = '2026-11-25';
 
 type LegalSection = {
   heading: string;
@@ -14,8 +14,8 @@ export type LegalDocument = {
 
 export const PRIVACY_POLICY: LegalDocument = {
   title: 'Privacy Policy',
-  effectiveDate: '04-15-2026',
-  lastUpdated: '04-15-2026',
+  effectiveDate: '11-25-2026',
+  lastUpdated: '11-25-2026',
   sections: [
     {
       heading: '1. Overview',
@@ -23,11 +23,11 @@ export const PRIVACY_POLICY: LegalDocument = {
     },
     {
       heading: '2. Information We Collect',
-      body: `We may collect the following categories of information:\n\n• Account and profile information: first name, last name, and email address.\n• Authentication information: sign-in details if you register with Google Sign-In (we receive profile/account data permitted by Google and authorized by you).\n• Usage and analytics information: interactions with app features, pages/screens visited, session information, device/app diagnostics, and other application analytics used to improve the user experience.\n• Device and technical information: device type, operating system, app version, identifiers, and crash/error logs.`,
+      body: `We may collect the following categories of information:\n\nThe App does not require or offer user accounts. We do not ask for your name, email address, or sign-in credentials.\n\n• Usage and analytics information: interactions with app features, pages/screens visited, session information, device/app diagnostics, and other application analytics used to improve the user experience.\n• Device and technical information: device type, operating system, app version, identifiers, and crash/error logs.`,
     },
     {
       heading: '3. How We Use Information',
-      body: `We use your information to:\n\n• create and manage your account;\n• authenticate you and secure access to the App;\n• provide and improve features, performance, and reliability;\n• analyze usage trends to enhance user experience;\n• communicate important service updates and support responses;\n• detect, investigate, and prevent abuse, fraud, or unauthorized activity;\n• comply with applicable legal obligations.`,
+      body: `We use your information to:\n\n• provide and improve features, performance, and reliability;\n• analyze usage trends to enhance user experience;\n• communicate important service updates and support responses;\n• detect, investigate, and prevent abuse, fraud, or unauthorized activity;\n• comply with applicable legal obligations.`,
     },
     {
       heading: '4. Analytics',
@@ -35,7 +35,7 @@ export const PRIVACY_POLICY: LegalDocument = {
     },
     {
       heading: '5. How We Share Information',
-      body: `We do not sell your personal information. We may share information in the following circumstances:\n\n• Service providers: trusted vendors that host infrastructure, authentication, analytics, and support operations.\n• Legal compliance and protection: where required by law, regulation, subpoena, court order, or to protect rights, safety, and security.\n• Business transfers: in connection with a merger, acquisition, financing, or sale of assets, subject to customary confidentiality obligations.`,
+      body: `We do not sell your personal information. We may share information in the following circumstances:\n\n• Service providers: trusted vendors that host infrastructure, analytics, and support operations.\n• Legal compliance and protection: where required by law, regulation, subpoena, court order, or to protect rights, safety, and security.\n• Business transfers: in connection with a merger, acquisition, financing, or sale of assets, subject to customary confidentiality obligations.`,
     },
     {
       heading: '6. Data Retention',
@@ -47,7 +47,7 @@ export const PRIVACY_POLICY: LegalDocument = {
     },
     {
       heading: '8. Your Choices and Rights',
-      body: `Depending on your location and applicable law, you may have rights to access, update, correct, delete, or restrict processing of your personal information. You may also have the right to withdraw consent where processing is based on consent.\n\nTo exercise rights or request account deletion, contact us at: support@joinarcs.com.`,
+      body: `Depending on your location and applicable law, you may have rights to access, update, correct, delete, or restrict processing of your personal information. You may also have the right to withdraw consent where processing is based on consent.\n\nTo exercise these rights, contact us at: support@joinarcs.com.`,
     },
     {
       heading: "9. Children's Privacy",
@@ -70,16 +70,16 @@ export const PRIVACY_POLICY: LegalDocument = {
 
 export const TERMS_OF_USE: LegalDocument = {
   title: 'Terms of Use',
-  effectiveDate: '04-15-2026',
-  lastUpdated: '04-15-2026',
+  effectiveDate: '11-25-2026',
+  lastUpdated: '11-25-2026',
   sections: [
     {
       heading: '1. Acceptance of Terms',
       body: `These Terms of Use ("Terms") govern your access to and use of Arcs (the "App"), operated by BigLemon LLC ("we," "our," or "us"). By accessing or using the App, you agree to be bound by these Terms.\n\nIf you do not agree to these Terms, do not use the App.`,
     },
     {
-      heading: '2. Eligibility and Account Registration',
-      body: `You must be at least 18 years old to use the App. You agree to provide accurate registration information, including first name, last name, and email address, and to keep your account information current.\n\nIf you register through Google Sign-In, you authorize us to access account information made available by Google in accordance with your permissions.`,
+      heading: '2. Eligibility',
+      body: `You must be at least 18 years old to use the App. No account or registration is required.`,
     },
     {
       heading: '3. App Purpose and No Betting Advice',
@@ -107,7 +107,7 @@ export const TERMS_OF_USE: LegalDocument = {
     },
     {
       heading: '9. Third-Party Services and Links',
-      body: `The App may integrate or link to third-party services (including authentication providers and analytics providers). We are not responsible for third-party products, services, content, or privacy practices.`,
+      body: `The App may integrate or link to third-party services (including data and analytics providers). We are not responsible for third-party products, services, content, or privacy practices.`,
     },
     {
       heading: '10. Suspension and Termination',

@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -141,6 +142,18 @@ export default function OnboardingScreen() {
         })}
       </View>
 
+      <ThemedText style={styles.legalText}>
+        By continuing you agree to the{' '}
+        <Link href="/legal/terms" style={styles.legalLink}>
+          Terms of Use
+        </Link>{' '}
+        and{' '}
+        <Link href="/legal/privacy" style={styles.legalLink}>
+          Privacy Policy
+        </Link>
+        .
+      </ThemedText>
+
       <View style={styles.buttonRow}>
         <Pressable
           disabled={isSubmitting}
@@ -252,6 +265,18 @@ const styles = StyleSheet.create({
   dot: {
     height: 8,
     borderRadius: 999,
+  },
+  legalText: {
+    marginBottom: 14,
+    color: '#71717A',
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  legalLink: {
+    color: '#111111',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   buttonRow: {
     flexDirection: 'row',

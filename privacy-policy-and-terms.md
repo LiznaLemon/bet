@@ -1,7 +1,7 @@
 # Privacy Policy and Terms of Use
 
-**Effective Date:** 04-15-2026  
-**Last Updated:** 04-15-2026  
+**Effective Date:** 11-25-2026  
+**Last Updated:** 11-25-2026  
 **App Name:** Arcs  
 **Operator:** BigLemon LLC
 
@@ -19,8 +19,8 @@ By using the App, you agree to the practices described in this Privacy Policy.
 
 We may collect the following categories of information:
 
-- **Account and profile information:** first name, last name, and email address.
-- **Authentication information:** sign-in details if you register with Google Sign-In (we receive profile/account data permitted by Google and authorized by you).
+The App does not require or offer user accounts. We do not ask for your name, email address, or sign-in credentials.
+
 - **Usage and analytics information:** interactions with app features, pages/screens visited, session information, device/app diagnostics, and other application analytics used to improve the user experience.
 - **Device and technical information:** device type, operating system, app version, identifiers, and crash/error logs.
 
@@ -28,8 +28,6 @@ We may collect the following categories of information:
 
 We use your information to:
 
-- create and manage your account;
-- authenticate you and secure access to the App;
 - provide and improve features, performance, and reliability;
 - analyze usage trends to enhance user experience;
 - communicate important service updates and support responses;
@@ -44,7 +42,7 @@ We collect application analytics to understand how users interact with the App a
 
 We do not sell your personal information. We may share information in the following circumstances:
 
-- **Service providers:** trusted vendors that host infrastructure, authentication, analytics, and support operations.
+- **Service providers:** trusted vendors that host infrastructure, analytics, and support operations.
 - **Legal compliance and protection:** where required by law, regulation, subpoena, court order, or to protect rights, safety, and security.
 - **Business transfers:** in connection with a merger, acquisition, financing, or sale of assets, subject to customary confidentiality obligations.
 
@@ -60,7 +58,7 @@ We implement reasonable administrative, technical, and organizational safeguards
 
 Depending on your location and applicable law, you may have rights to access, update, correct, delete, or restrict processing of your personal information. You may also have the right to withdraw consent where processing is based on consent.
 
-To exercise rights or request account deletion, contact us at: **support@joinarcs.com**.
+To exercise these rights, contact us at: **support@joinarcs.com**.
 
 ### 9. Children's Privacy
 
@@ -90,11 +88,9 @@ These Terms of Use ("Terms") govern your access to and use of Arcs (the "App"), 
 
 If you do not agree to these Terms, do not use the App.
 
-### 2. Eligibility and Account Registration
+### 2. Eligibility
 
-You must be at least 18 years old to use the App. You agree to provide accurate registration information, including first name, last name, and email address, and to keep your account information current.
-
-If you register through Google Sign-In, you authorize us to access account information made available by Google in accordance with your permissions.
+You must be at least 18 years old to use the App. No account or registration is required.
 
 ### 3. App Purpose and No Betting Advice
 
@@ -137,7 +133,7 @@ All App content, trademarks, logos, designs, software, and related materials are
 
 ### 9. Third-Party Services and Links
 
-The App may integrate or link to third-party services (including authentication providers and analytics providers). We are not responsible for third-party products, services, content, or privacy practices.
+The App may integrate or link to third-party services (including data and analytics providers). We are not responsible for third-party products, services, content, or privacy practices.
 
 ### 10. Suspension and Termination
 

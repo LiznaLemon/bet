@@ -1,0 +1,82 @@
+name: NBA data update
+
+# Pulls finished games from ESPN and writes them to Supabase.
+# Runs hourly; the updater auto-detects playoff/regular/offseason mode.
+# Use "Run workflow" for manual backfills (from/to) or dry runs.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Start date YYYY-MM-DD (optional; default = day after last loaded game)"
+        required: false
+        type: string
+      to:
+        description: "End date YYYY-MM-DD (optional; default = today)"
+        required: false
+        type: string
+      mode:
+        description: "Pipeline mode"
+        required: false
+        default: auto
+        type: choice
+        options: [auto, playoff, regular, offseason]
+      dry_run:
+        description: "Fetch and parse only; no DB writes"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: nba-data-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    name: Update NBA data
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: scripts/update-nba-games-scripts
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scripts/update-nba-games-scripts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run updater
+        env:
+          SUPABASE_API_URL: ${{ secrets.SUPABASE_API_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          INPUT_FROM: ${{ inputs.from }}
+          INPUT_TO: ${{ inputs.to }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ -z "$SUPABASE_API_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::SUPABASE_API_URL and SUPABASE_SERVICE_ROLE_KEY secrets must be set"
+            exit 1
+          fi
+
+          args=(--mode "${INPUT_MODE:-auto}")
+          [ -n "$INPUT_FROM" ] && args+=(--from "$INPUT_FROM")
+          [ -n "$INPUT_TO" ] && args+=(--to "$INPUT_TO")
+          [ "$INPUT_DRY_RUN" = "true" ] && args+=(--dry-run)
+
+          echo "Running: node update-nba-data.js ${args[*]}"
+          node update-nba-data.js "${args[@]}"

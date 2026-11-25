@@ -76,6 +76,16 @@ No authentication required. The summary returns `header`, `plays`, `boxscore` (t
 
 ## Running
 
+### In production (GitHub Actions)
+
+The `.github/workflows/nba-data-update.yml` workflow runs this script every hour on a GitHub-hosted runner (`--mode auto`). It uses the repo secrets `SUPABASE_API_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Runs are recorded in `pipeline_run_audit`, and a failed run fails the workflow, so GitHub sends a notification.
+
+To backfill or test, open **Actions → NBA data update → Run workflow**. You can set `from`, `to`, `mode`, and `dry_run` there.
+
+> `scripts/refresh_db.yml` is the legacy hoopR (R) full-season loader. It is not wired into `.github/workflows` and is only kept as a manual one-off for a full reload.
+
+### Locally
+
 ```bash
 # Default: from day after last DB date to today
 npm run update

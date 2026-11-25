@@ -7,7 +7,7 @@ export default function LegalLayout() {
       router.back();
       return;
     }
-    router.replace('/(auth)/sign-up');
+    router.replace('/schedule');
   };
 
   return (

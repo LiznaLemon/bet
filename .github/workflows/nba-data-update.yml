@@ -59,6 +59,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check Supabase connection
+        env:
+          SUPABASE_API_URL: ${{ secrets.SUPABASE_API_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Fail fast on a wrong URL or key. The updater treats read errors as
+          # empty tables, which would otherwise look like a fresh database.
+          status=$(curl -sS -o /tmp/preflight.json -w '%{http_code}' \
+            "${SUPABASE_API_URL%/}/rest/v1/schedules?select=game_id,game_date&order=game_date.desc&limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY") || status="curl-error"
+          echo "HTTP $status"
+          head -c 300 /tmp/preflight.json; echo
+          if [ "$status" != "200" ]; then
+            echo "::error::Supabase request failed (HTTP $status). Check SUPABASE_API_URL and SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          fi
+          if [ "$(cat /tmp/preflight.json)" = "[]" ]; then
+            echo "::error::schedules table is empty. SUPABASE_API_URL may point at the wrong project."
+            exit 1
+          fi
+
       - name: Run updater
         env:
           SUPABASE_API_URL: ${{ secrets.SUPABASE_API_URL }}
